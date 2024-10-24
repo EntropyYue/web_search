@@ -2,7 +2,7 @@
 title: Web Search using SearXNG and Scrape first N Pages
 author: constLiakos with enhancements by justinh-rahb and ther3zz
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.3.0
+version: 0.4.1
 license: MIT
 """
 
