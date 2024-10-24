@@ -2,7 +2,7 @@
 title: Web Search using SearXNG and Scrape first N Pages
 author: constLiakos with enhancements by justinh-rahb and ther3zz
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.4.2
+version: 0.4.3
 license: MIT
 """
 
@@ -279,9 +279,9 @@ class Tools:
         self, url: str, __event_emitter__: Callable[[dict], Any] = None
     ) -> str:
         """
-        访问输入的网站并获取其内容
+        打开输入的网站并获取其内容
 
-        :params url: The URL of the website.
+        :params url: 需要打开的网站
 
         :return: The content of the website in json format.
         """
@@ -301,8 +301,6 @@ class Tools:
             response_site.raise_for_status()
             html_content = response_site.text
 
-            await emitter.emit("解析网站内容")
-
             soup = BeautifulSoup(html_content, "html.parser")
 
             page_title = soup.title.string if soup.title else "No title found"
@@ -311,7 +309,7 @@ class Tools:
             title_site = page_title
             url_site = url
             content_site = functions.format_text(
-                soup.get_text(separator=" ", strip=True)
+                soup.get_text(separator=" ", strip=True), self.valves
             )
 
             truncated_content = functions.truncate_to_n_words(
