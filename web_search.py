@@ -2,7 +2,7 @@
 title: Web Search using SearXNG and Scrape first N Pages
 author: constLiakos with enhancements by justinh-rahb and ther3zz
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.4.1
+version: 0.4.2
 license: MIT
 """
 
@@ -107,7 +107,7 @@ class EventEmitter:
         description="未知状态",
         status="in_progress",
         done=False,
-        action="web_search",
+        action="",
         urls=[],
     ):
         if self.event_emitter:
@@ -269,6 +269,7 @@ class Tools:
             status="complete",
             description=f"网络搜索已完成,将从 {len(results_json)} 个页面检索内容",
             done=True,
+            action="web_search",
             urls=urls,
         )
 
