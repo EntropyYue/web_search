@@ -95,38 +95,6 @@ class HelpFunctions:
         truncated_tokens = tokens[:token_limit]
         return " ".join(truncated_tokens)
 
-    def rag_process(self, context: str, valves) -> str:
-        url = "http://127.0.0.1:8080/retrieval/api/v1/process/text"
-        self.headers = {
-            "Authorization": f"Bearer {valves.OPEN_WEBUI_TOKEN}",
-            "accept": "application/json",
-            "Content-Type": "application/json",
-        }
-        collection = str(hash(context))
-        data = {"name": "rag_search", "content": context, "collection_name": collection}
-        response = requests.post(url, headers=self.headers, json=data)
-        if response.status_code == 200:
-            return collection
-        else:
-            raise Exception(f"Error processing text: {response.json()}")
-
-    def rag_search(self, context: str, query: str, valves) -> dict:
-        collection = self.rag_process(context, valves)
-        url = "http://127.0.0.1:8080/retrieval/api/v1/query/collection"
-        data = {
-            "collection_names": [collection],
-            "query": query,
-            "k": 0,
-            "r": 0,
-            "hybrid": True,
-        }
-        response = requests.post(url, headers=self.headers, json=data)
-        if response.status_code == 200:
-            return response.json()["documents"][0]
-        else:
-            raise Exception(f"Error searching collection: {response.json()}")
-
-
 class EventEmitter:
     def __init__(self, event_emitter: Callable[[dict], Any] = None):
         self.event_emitter = event_emitter
@@ -188,17 +156,9 @@ class Tools:
             default="https://r.jina.ai/",
             description="Jina Reader的基础URL",
         )
-        RAG_ENABLE: bool = Field(
-            default=False,
-            description="是否启用RAG",
-        )
         REMOVE_LINKS: bool = Field(
             default=True,
             description="检索中的返回是否移除链接",
-        )
-        OPEN_WEBUI_TOKEN: str = Field(
-            default="",
-            description="open-webui令牌",
         )
 
     def __init__(self):
@@ -272,11 +232,6 @@ class Tools:
                         result_json = future.result()
                         if result_json:
                             try:
-                                if self.valves.RAG_ENABLE:
-                                    result_json["content"] = functions.rag_search(
-                                        result_json["content"], query, self.valves
-                                    )
-                                json.dumps(result_json)
                                 results_json.append(result_json)
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
@@ -306,13 +261,6 @@ class Tools:
                                 },
                             }
                         )
-                if len(results_json):
-                    await emitter.message(
-                        "\n<details>\n<summary>检索到的网站标题</summary>\n"
-                    )
-                    for result in results_json:
-                        await emitter.message("> " + result["title"] + "\n\n")
-                    await emitter.message("\n</details>\n")
 
         urls =[]
         for result in results_json:
@@ -320,7 +268,7 @@ class Tools:
 
         await emitter.emit(
             status="complete",
-            description=f"网络搜索已完成,将从 {len(results_json)} 个页面检索内容",
+            description=f"网络搜索已完成，将从 {len(results_json)} 个页面检索内容",
             done=True,
             urls=urls
         )
