@@ -49,7 +49,7 @@ class HelpFunctions:
         return "".join(c for c in text if not unicodedata.category(c).startswith("So"))
 
     def replace_urls_with_text(self, text, replacement="(links)"):
-        pattern = r'\(https?://[^\s]+\)'
+        pattern = r"\(https?://[^\s]+\)"
         return re.sub(pattern, replacement, text)
 
     def process_search_result(self, result, valves):
@@ -74,7 +74,9 @@ class HelpFunctions:
             html_content = response_site.text
 
             soup = BeautifulSoup(html_content, "html.parser")
-            content_site = self.format_text(soup.get_text(separator=" ", strip=True), valves)
+            content_site = self.format_text(
+                soup.get_text(separator=" ", strip=True), valves
+            )
 
             truncated_content = self.truncate_to_n_words(
                 content_site, valves.PAGE_CONTENT_WORDS_LIMIT
@@ -95,11 +97,19 @@ class HelpFunctions:
         truncated_tokens = tokens[:token_limit]
         return " ".join(truncated_tokens)
 
+
 class EventEmitter:
     def __init__(self, event_emitter: Callable[[dict], Any] = None):
         self.event_emitter = event_emitter
 
-    async def emit(self, description="未知状态", status="in_progress", done=False, action = "web_search", urls=[]):
+    async def emit(
+        self,
+        description="未知状态",
+        status="in_progress",
+        done=False,
+        action="web_search",
+        urls=[],
+    ):
         if self.event_emitter:
             await self.event_emitter(
                 {
@@ -109,18 +119,7 @@ class EventEmitter:
                         "description": description,
                         "done": done,
                         "action": action,
-                        "urls": urls
-                    },
-                }
-            )
-
-    async def message(self, content):
-        if self.event_emitter:
-            await self.event_emitter(
-                {
-                    "type": "message",
-                    "data": {
-                        "content": content,
+                        "urls": urls,
                     },
                 }
             )
@@ -262,15 +261,15 @@ class Tools:
                             }
                         )
 
-        urls =[]
+        urls = []
         for result in results_json:
             urls.append(result["url"])
 
         await emitter.emit(
             status="complete",
-            description=f"网络搜索已完成，将从 {len(results_json)} 个页面检索内容",
+            description=f"网络搜索已完成,将从 {len(results_json)} 个页面检索内容",
             done=True,
-            urls=urls
+            urls=urls,
         )
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
