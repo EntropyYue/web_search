@@ -131,7 +131,7 @@ class EventEmitter:
     def __init__(self, event_emitter: Callable[[dict], Any] = None):
         self.event_emitter = event_emitter
 
-    async def emit(self, description="未知状态", status="in_progress", done=False):
+    async def emit(self, description="未知状态", status="in_progress", done=False, action = "web_search", urls=[]):
         if self.event_emitter:
             await self.event_emitter(
                 {
@@ -140,6 +140,8 @@ class EventEmitter:
                         "status": status,
                         "description": description,
                         "done": done,
+                        "action": action,
+                        "urls": urls
                     },
                 }
             )
@@ -312,10 +314,15 @@ class Tools:
                         await emitter.message("> " + result["title"] + "\n\n")
                     await emitter.message("\n</details>\n")
 
+        urls =[]
+        for result in results_json:
+            urls.append(result["url"])
+
         await emitter.emit(
             status="complete",
             description=f"网络搜索已完成,将从 {len(results_json)} 个页面检索内容",
             done=True,
+            urls=urls
         )
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
