@@ -6,19 +6,14 @@ version: 0.4.4
 license: MIT
 """
 
-import os
 import requests
-from datetime import datetime
 import json
-from requests import get
 from bs4 import BeautifulSoup
 import concurrent.futures
-from html.parser import HTMLParser
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 import re
 import unicodedata
 from pydantic import BaseModel, Field
-import asyncio
 from typing import Callable, Any
 
 
@@ -89,7 +84,7 @@ class HelpFunctions:
                 "snippet": self.remove_emojis(snippet),
             }
 
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             return None
 
     def truncate_to_n_words(self, text, token_limit):
@@ -217,7 +212,7 @@ class Tools:
 
         results_json = []
         if limited_results:
-            await emitter.emit(f"正在处理搜索结果")
+            await emitter.emit("正在处理搜索结果")
 
             try:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
