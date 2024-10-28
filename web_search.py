@@ -2,7 +2,7 @@
 title: Web Search using SearXNG and Scrape first N Pages
 author: constLiakos with enhancements by justinh-rahb and ther3zz
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.4.3
+version: 0.4.4
 license: MIT
 """
 
@@ -227,11 +227,17 @@ class Tools:
                         )
                         for result in limited_results
                     ]
+
+                    processed_count = 0
                     for future in concurrent.futures.as_completed(futures):
                         result_json = future.result()
                         if result_json:
                             try:
                                 results_json.append(result_json)
+                                processed_count += 1
+                                await emitter.emit(
+                                    f"处理页面 {processed_count}/{len(limited_results)}",
+                                )
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
                                 continue
