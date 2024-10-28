@@ -2,23 +2,18 @@
 title: Web Search using SearXNG and Scrape first N Pages
 author: constLiakos with enhancements by justinh-rahb and ther3zz
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.4.1
+version: 0.4.4
 license: MIT
 """
 
-import os
 import requests
-from datetime import datetime
 import json
-from requests import get
 from bs4 import BeautifulSoup
 import concurrent.futures
-from html.parser import HTMLParser
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse
 import re
 import unicodedata
 from pydantic import BaseModel, Field
-import asyncio
 from typing import Callable, Any
 
 
@@ -49,7 +44,7 @@ class HelpFunctions:
         return "".join(c for c in text if not unicodedata.category(c).startswith("So"))
 
     def replace_urls_with_text(self, text, replacement="(links)"):
-        pattern = r'\(https?://[^\s]+\)'
+        pattern = r"\(https?://[^\s]+\)"
         return re.sub(pattern, replacement, text)
 
     def process_search_result(self, result, valves):
@@ -74,7 +69,9 @@ class HelpFunctions:
             html_content = response_site.text
 
             soup = BeautifulSoup(html_content, "html.parser")
-            content_site = self.format_text(soup.get_text(separator=" ", strip=True), valves)
+            content_site = self.format_text(
+                soup.get_text(separator=" ", strip=True), valves
+            )
 
             truncated_content = self.truncate_to_n_words(
                 content_site, valves.PAGE_CONTENT_WORDS_LIMIT
@@ -87,7 +84,7 @@ class HelpFunctions:
                 "snippet": self.remove_emojis(snippet),
             }
 
-        except requests.exceptions.RequestException as e:
+        except requests.exceptions.RequestException:
             return None
 
     def truncate_to_n_words(self, text, token_limit):
@@ -95,11 +92,19 @@ class HelpFunctions:
         truncated_tokens = tokens[:token_limit]
         return " ".join(truncated_tokens)
 
+
 class EventEmitter:
     def __init__(self, event_emitter: Callable[[dict], Any] = None):
         self.event_emitter = event_emitter
 
-    async def emit(self, description="未知状态", status="in_progress", done=False, action = "web_search", urls=[]):
+    async def emit(
+        self,
+        description="未知状态",
+        status="in_progress",
+        done=False,
+        action="",
+        urls=[],
+    ):
         if self.event_emitter:
             await self.event_emitter(
                 {
@@ -109,18 +114,7 @@ class EventEmitter:
                         "description": description,
                         "done": done,
                         "action": action,
-                        "urls": urls
-                    },
-                }
-            )
-
-    async def message(self, content):
-        if self.event_emitter:
-            await self.event_emitter(
-                {
-                    "type": "message",
-                    "data": {
-                        "content": content,
+                        "urls": urls,
                     },
                 }
             )
@@ -218,7 +212,7 @@ class Tools:
 
         results_json = []
         if limited_results:
-            await emitter.emit(f"正在处理搜索结果")
+            await emitter.emit("正在处理搜索结果")
 
             try:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -228,11 +222,17 @@ class Tools:
                         )
                         for result in limited_results
                     ]
+
+                    processed_count = 0
                     for future in concurrent.futures.as_completed(futures):
                         result_json = future.result()
                         if result_json:
                             try:
                                 results_json.append(result_json)
+                                processed_count += 1
+                                await emitter.emit(
+                                    f"处理页面 {processed_count}/{len(limited_results)}",
+                                )
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
                                 continue
@@ -262,15 +262,16 @@ class Tools:
                             }
                         )
 
-        urls =[]
+        urls = []
         for result in results_json:
             urls.append(result["url"])
 
         await emitter.emit(
             status="complete",
-            description=f"网络搜索已完成，将从 {len(results_json)} 个页面检索内容",
+            description=f"网络搜索已完成,将从 {len(results_json)} 个页面检索内容",
             done=True,
-            urls=urls
+            action="web_search",
+            urls=urls,
         )
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
@@ -279,9 +280,9 @@ class Tools:
         self, url: str, __event_emitter__: Callable[[dict], Any] = None
     ) -> str:
         """
-        访问输入的网站并获取其内容
+        打开输入的网站并获取其内容
 
-        :params url: The URL of the website.
+        :params url: 需要打开的网站
 
         :return: The content of the website in json format.
         """
@@ -301,8 +302,6 @@ class Tools:
             response_site.raise_for_status()
             html_content = response_site.text
 
-            await emitter.emit("解析网站内容")
-
             soup = BeautifulSoup(html_content, "html.parser")
 
             page_title = soup.title.string if soup.title else "No title found"
@@ -311,7 +310,7 @@ class Tools:
             title_site = page_title
             url_site = url
             content_site = functions.format_text(
-                soup.get_text(separator=" ", strip=True)
+                soup.get_text(separator=" ", strip=True), self.valves
             )
 
             truncated_content = functions.truncate_to_n_words(
