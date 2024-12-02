@@ -147,8 +147,8 @@ class Tools:
             description="如果为True，则发送带有链接的自定义引用",
         )
         JINA_READER_BASE_URL: str = Field(
-            default="https://r.jina.ai/",
-            description="Jina Reader的基础URL",
+            default="",
+            description="Jina Reader的基础URL，使用默认参数以关闭",
         )
         REMOVE_LINKS: bool = Field(
             default=True,
@@ -268,7 +268,7 @@ class Tools:
 
         await emitter.emit(
             status="complete",
-            description=f"网络搜索已完成,将从 {len(results_json)} 个页面检索内容",
+            description=f"搜索到 {len(results_json)} 个结果",
             done=True,
             action="web_search",
             urls=urls,
