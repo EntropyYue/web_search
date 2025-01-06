@@ -69,9 +69,9 @@ class HelpFunctions:
             html_content = response_site.text
 
             soup = BeautifulSoup(html_content, "html.parser")
-            content_site = self.format_text(
-                soup.get_text(separator=" ", strip=True), valves
-            )
+            content_site = soup.get_text(separator=" ", strip=True)
+            if valves.JINA_READER_BASE_URL != "":
+                content_site = self.format_text(content_site, valves)
 
             truncated_content = self.truncate_to_n_words(
                 content_site, valves.PAGE_CONTENT_WORDS_LIMIT
