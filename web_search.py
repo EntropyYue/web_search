@@ -2,7 +2,7 @@
 title: Web Search using SearXNG and Scrape first N Pages
 author: constLiakos with enhancements by justinh-rahb and ther3zz
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.4.4
+version: 0.4.5
 license: MIT
 """
 
@@ -292,6 +292,9 @@ class Tools:
         await emitter.emit(f"正在从URL获取内容: {url}")
 
         results_json = []
+
+        if url.strip() == "":
+            return ""
 
         try:
             response_site = requests.get(
