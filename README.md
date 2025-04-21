@@ -18,7 +18,7 @@
 
 ## 来源
 
-此工具的原始代码来自[此处](https://openwebui.com/t/constliakos/web_search)，加入了使用jina-reader提取内容和折叠的搜索结果标题等新功能后发布
+此工具的原始代码来自[此处](https://openwebui.com/t/constliakos/web_search)
 
 ## 贡献
 
