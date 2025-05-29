@@ -65,6 +65,7 @@ class HelpFunctions:
             response_site = requests.get(
                 valves.JINA_READER_BASE_URL + url_site, timeout=20
             )
+            response_site.encoding = response_site.apparent_encoding
             response_site.raise_for_status()
             html_content = response_site.text
 
@@ -314,6 +315,7 @@ class Tools:
                 headers=self.headers,
                 timeout=120,
             )
+            response_site.encoding = response_site.apparent_encoding
             response_site.raise_for_status()
             html_content = response_site.text
 
