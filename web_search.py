@@ -95,7 +95,7 @@ class HelpFunctions:
 
 
 class EventEmitter:
-    def __init__(self, event_emitter: Callable[[dict], Any] = None):
+    def __init__(self, event_emitter: Callable[[dict], Any] | None = None):
         self.event_emitter = event_emitter
 
     async def emit(
@@ -169,7 +169,7 @@ class Tools:
     async def search_web(
         self,
         query: str,
-        __event_emitter__: Callable[[dict], Any] = None,
+        __event_emitter__: Callable[[dict], Any] | None = None,
     ) -> str:
         """
         搜索网络并获取相关页面的内容，搜索未知知识、新闻、信息、公共联系信息、天气等
@@ -290,7 +290,7 @@ class Tools:
         return json.dumps(results_json, indent=4, ensure_ascii=False)
 
     async def get_website(
-        self, url: str, __event_emitter__: Callable[[dict], Any] = None
+        self, url: str, __event_emitter__: Callable[[dict], Any] | None = None
     ) -> str:
         """
         打开输入的网站并获取其内容
@@ -321,7 +321,7 @@ class Tools:
 
             soup = BeautifulSoup(html_content, "html.parser")
 
-            page_title = soup.title.string if soup.title else "No title found"
+            page_title = soup.title.string if soup.title and soup.title.string else "No title found"
             page_title = unicodedata.normalize("NFKC", page_title.strip())
             page_title = functions.remove_emojis(page_title)
             title_site = page_title
