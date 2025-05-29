@@ -1,8 +1,8 @@
 """
-title: Web Search using SearXNG and Scrape first N Pages
-author: constLiakos with enhancements by justinh-rahb and ther3zz
+title: Web Search
+author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.4.4
+version: 0.4.5
 license: MIT
 """
 
@@ -65,6 +65,7 @@ class HelpFunctions:
             response_site = requests.get(
                 valves.JINA_READER_BASE_URL + url_site, timeout=20
             )
+            response_site.encoding = response_site.apparent_encoding
             response_site.raise_for_status()
             html_content = response_site.text
 
@@ -154,6 +155,10 @@ class Tools:
             default=True,
             description="检索中的返回是否移除链接",
         )
+        status: bool = Field(
+            default=True,
+            description="如果为True，则发送状态",
+        )
 
     def __init__(self):
         self.valves = self.Valves()
@@ -176,7 +181,8 @@ class Tools:
         functions = HelpFunctions()
         emitter = EventEmitter(__event_emitter__)
 
-        await emitter.emit(f"正在搜索: {query}")
+        if self.valves.status:
+            await emitter.emit(f"正在搜索: {query}")
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
 
@@ -191,7 +197,8 @@ class Tools:
         }
 
         try:
-            await emitter.emit("正在向搜索引擎发送请求")
+            if self.valves.status:
+                await emitter.emit("正在向搜索引擎发送请求")
             resp = requests.get(
                 search_engine_url, params=params, headers=self.headers, timeout=120
             )
@@ -200,19 +207,22 @@ class Tools:
 
             results = data.get("results", [])
             limited_results = results[: self.valves.SCRAPPED_PAGES_NO]
-            await emitter.emit(f"返回了 {len(limited_results)} 个搜索结果")
+            if self.valves.status:
+                await emitter.emit(f"返回了 {len(limited_results)} 个搜索结果")
 
         except requests.exceptions.RequestException as e:
-            await emitter.emit(
-                status="error",
-                description=f"搜索时出错: {str(e)}",
-                done=True,
-            )
+            if self.valves.status:
+                await emitter.emit(
+                    status="error",
+                    description=f"搜索时出错: {str(e)}",
+                    done=True,
+                )
             return json.dumps({"error": str(e)})
 
         results_json = []
         if limited_results:
-            await emitter.emit("正在处理搜索结果")
+            if self.valves.status:
+                await emitter.emit("正在处理搜索结果")
 
             try:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -230,9 +240,10 @@ class Tools:
                             try:
                                 results_json.append(result_json)
                                 processed_count += 1
-                                await emitter.emit(
-                                    f"处理页面 {processed_count}/{len(limited_results)}",
-                                )
+                                if self.valves.status:
+                                    await emitter.emit(
+                                        f"处理页面 {processed_count}/{len(limited_results)}",
+                                    )
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
                                 continue
@@ -240,11 +251,12 @@ class Tools:
                             break
 
             except BaseException as e:
-                await emitter.emit(
-                    status="error",
-                    description=f"处理时出错: {str(e)}",
-                    done=True,
-                )
+                if self.valves.status:
+                    await emitter.emit(
+                        status="error",
+                        description=f"处理时出错: {str(e)}",
+                        done=True,
+                    )
 
             results_json = results_json[: self.valves.RETURNED_SCRAPPED_PAGES_NO]
 
@@ -266,13 +278,14 @@ class Tools:
         for result in results_json:
             urls.append(result["url"])
 
-        await emitter.emit(
-            status="complete",
-            description=f"搜索到 {len(results_json)} 个结果",
-            done=True,
-            action="web_search",
-            urls=urls,
-        )
+        if self.valves.status:
+            await emitter.emit(
+                status="complete",
+                description=f"搜索到 {len(results_json)} 个结果",
+                done=True,
+                action="web_search",
+                urls=urls,
+            )
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
 
@@ -288,10 +301,13 @@ class Tools:
         """
         functions = HelpFunctions()
         emitter = EventEmitter(__event_emitter__)
-
-        await emitter.emit(f"正在从URL获取内容: {url}")
+        if self.valves.status:
+            await emitter.emit(f"正在从URL获取内容: {url}")
 
         results_json = []
+
+        if url.strip() == "":
+            return ""
 
         try:
             response_site = requests.get(
@@ -299,6 +315,7 @@ class Tools:
                 headers=self.headers,
                 timeout=120,
             )
+            response_site.encoding = response_site.apparent_encoding
             response_site.raise_for_status()
             html_content = response_site.text
 
@@ -338,11 +355,12 @@ class Tools:
                     }
                 )
 
-            await emitter.emit(
-                status="complete",
-                description="已成功检索和处理网站内容",
-                done=True,
-            )
+            if self.valves.status:
+                await emitter.emit(
+                    status="complete",
+                    description="已成功检索和处理网站内容",
+                    done=True,
+                )
 
         except requests.exceptions.RequestException as e:
             results_json.append(
@@ -352,10 +370,11 @@ class Tools:
                 }
             )
 
-            await emitter.emit(
-                status="error",
-                description=f"获取网站内容时出错: {str(e)}",
-                done=True,
-            )
+            if self.valves.status:
+                await emitter.emit(
+                    status="error",
+                    description=f"获取网站内容时出错: {str(e)}",
+                    done=True,
+                )
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
