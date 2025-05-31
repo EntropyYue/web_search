@@ -321,7 +321,11 @@ class Tools:
 
             soup = BeautifulSoup(html_content, "html.parser")
 
-            page_title = soup.title.string if soup.title and soup.title.string else "No title found"
+            page_title = (
+                soup.title.string
+                if soup.title and soup.title.string
+                else "No title found"
+            )
             page_title = unicodedata.normalize("NFKC", page_title.strip())
             page_title = functions.remove_emojis(page_title)
             title_site = page_title
