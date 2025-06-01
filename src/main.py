@@ -2,15 +2,13 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.6.0
+version: 0.6.1
 license: MIT
 """
 
 import requests
 import json
-from bs4 import BeautifulSoup
 import concurrent.futures
-import unicodedata
 from pydantic import BaseModel, Field
 from typing import Callable, Any
 
@@ -205,76 +203,26 @@ class Tools:
         if url.strip() == "":
             return ""
 
-        try:
-            response_site = requests.get(
-                self.valves.JINA_READER_BASE_URL + url,
-                headers=self.headers,
-                timeout=120,
-            )
-            response_site.encoding = response_site.apparent_encoding
-            response_site.raise_for_status()
-            html_content = response_site.text
+        result_site = functions.fetch_and_process_page(url, self.valves)
+        results_json.append(result_site)
 
-            soup = BeautifulSoup(html_content, "html.parser")
-
-            page_title = (
-                soup.title.string
-                if soup.title and soup.title.string
-                else "No title found"
-            )
-            page_title = unicodedata.normalize("NFKC", page_title.strip())
-            page_title = functions.remove_emojis(page_title)
-            title_site = page_title
-            url_site = url
-            content_site = functions.format_text(
-                soup.get_text(separator=" ", strip=True), self.valves
-            )
-
-            truncated_content = functions.truncate_to_n_words(
-                content_site, self.valves.PAGE_CONTENT_WORDS_LIMIT
-            )
-
-            result_site = {
-                "title": title_site,
-                "url": url_site,
-                "content": truncated_content,
-                "excerpt": functions.generate_excerpt(content_site),
-            }
-
-            results_json.append(result_site)
-
-            if self.valves.CITATION_LINKS and __event_emitter__:
-                await __event_emitter__(
-                    {
-                        "type": "citation",
-                        "data": {
-                            "document": [truncated_content],
-                            "metadata": [{"source": url_site}],
-                            "source": {"name": title_site},
-                        },
-                    }
-                )
-
-            if self.valves.status:
-                await emitter.emit(
-                    status="complete",
-                    description="已成功检索和处理网站内容",
-                    done=True,
-                )
-
-        except requests.exceptions.RequestException as e:
-            results_json.append(
+        if (
+            self.valves.CITATION_LINKS
+            and "content" in result_site
+            and __event_emitter__
+        ):
+            await __event_emitter__(
                 {
-                    "url": url,
-                    "content": f"检索页面失败,错误: {str(e)}",
+                    "type": "citation",
+                    "data": {
+                        "document": [result_site["content"]],
+                        "metadata": [{"source": result_site["url"]}],
+                        "source": {"name": result_site["title"]},
+                    },
                 }
             )
-
-            if self.valves.status:
-                await emitter.emit(
-                    status="error",
-                    description=f"获取网站内容时出错: {str(e)}",
-                    done=True,
-                )
-
+        if self.valves.status:
+            await emitter.emit(
+                status="complete", description="已成功检索和处理网站内容", done=True
+            )
         return json.dumps(results_json, indent=4, ensure_ascii=False)

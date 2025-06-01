@@ -36,12 +36,43 @@ class HelpFunctions:
         pattern = r"\(https?://[^\s]+\)"
         return re.sub(pattern, replacement, text)
 
+    def fetch_and_process_page(self, url, valves):
+        try:
+            response_site = requests.get(valves.JINA_READER_BASE_URL + url, timeout=20)
+            response_site.encoding = response_site.apparent_encoding
+            response_site.raise_for_status()
+            html_content = response_site.text
+            soup = BeautifulSoup(html_content, "html.parser")
+            page_title = (
+                soup.title.string
+                if soup.title and soup.title.string
+                else "No title found"
+            )
+            page_title = unicodedata.normalize("NFKC", page_title.strip())
+            page_title = self.remove_emojis(page_title)
+
+            content_site = self.format_text(
+                soup.get_text(separator=" ", strip=True), valves
+            )
+            truncated_content = self.truncate_to_n_words(
+                content_site, valves.PAGE_CONTENT_WORDS_LIMIT
+            )
+            return {
+                "title": page_title,
+                "url": url,
+                "content": truncated_content,
+                "excerpt": self.generate_excerpt(content_site),
+            }
+        except requests.exceptions.RequestException as e:
+            return {
+                "url": url,
+                "content": f"检索页面失败,错误: {str(e)}",
+            }
+
     def process_search_result(self, result, valves):
-        title_site = self.remove_emojis(result["title"])
+        self.remove_emojis(result["title"])
         url_site = result["url"]
         snippet = result.get("content", "")
-
-        # Check if the website is in the ignored list, but only if IGNORED_WEBSITES is not empty
         if valves.IGNORED_WEBSITES:
             base_url = self.get_base_url(url_site)
             if any(
@@ -50,32 +81,11 @@ class HelpFunctions:
             ):
                 return None
 
-        try:
-            response_site = requests.get(
-                valves.JINA_READER_BASE_URL + url_site, timeout=20
-            )
-            response_site.encoding = response_site.apparent_encoding
-            response_site.raise_for_status()
-            html_content = response_site.text
-
-            soup = BeautifulSoup(html_content, "html.parser")
-            content_site = soup.get_text(separator=" ", strip=True)
-            if valves.JINA_READER_BASE_URL != "":
-                content_site = self.format_text(content_site, valves)
-
-            truncated_content = self.truncate_to_n_words(
-                content_site, valves.PAGE_CONTENT_WORDS_LIMIT
-            )
-
-            return {
-                "title": title_site,
-                "url": url_site,
-                "content": truncated_content,
-                "snippet": self.remove_emojis(snippet),
-            }
-
-        except requests.exceptions.RequestException:
-            return None
+        result_data = self.fetch_and_process_page(url_site, valves)
+        if "content" in result_data and "检索页面失败" not in result_data["content"]:
+            result_data["snippet"] = self.remove_emojis(snippet)
+            return result_data
+        return None
 
     def truncate_to_n_words(self, text, token_limit):
         tokens = text.split()
