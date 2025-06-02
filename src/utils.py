@@ -61,7 +61,6 @@ class HelpFunctions:
                 "title": page_title,
                 "url": url,
                 "content": truncated_content,
-                "excerpt": self.generate_excerpt(content_site),
             }
         except requests.exceptions.RequestException as e:
             return {
