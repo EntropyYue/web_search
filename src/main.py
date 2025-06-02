@@ -45,7 +45,7 @@ class Tools:
             default=True,
             description="检索中的返回是否移除链接",
         )
-        status: bool = Field(
+        STATUS: bool = Field(
             default=True,
             description="如果为True，则发送状态",
         )
@@ -71,7 +71,7 @@ class Tools:
         functions = HelpFunctions()
         emitter = EventEmitter(__event_emitter__)
 
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(f"正在搜索: {query}")
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
@@ -83,7 +83,7 @@ class Tools:
         }
 
         try:
-            if self.valves.status:
+            if self.valves.STATUS:
                 await emitter.emit("正在向搜索引擎发送请求")
             resp = requests.get(
                 search_engine_url, params=params, headers=self.headers, timeout=120
@@ -92,11 +92,11 @@ class Tools:
             data = resp.json()
 
             results = data.get("results", [])
-            if self.valves.status:
+            if self.valves.STATUS:
                 await emitter.emit(f"返回了 {len(results)} 个搜索结果")
 
         except requests.exceptions.RequestException as e:
-            if self.valves.status:
+            if self.valves.STATUS:
                 await emitter.emit(
                     status="error",
                     description=f"搜索时出错: {str(e)}",
@@ -106,7 +106,7 @@ class Tools:
 
         results_json = []
         if results:
-            if self.valves.status:
+            if self.valves.STATUS:
                 await emitter.emit("正在处理搜索结果")
 
             try:
@@ -125,7 +125,7 @@ class Tools:
                             try:
                                 results_json.append(result_json)
                                 processed_count += 1
-                                if self.valves.status:
+                                if self.valves.STATUS:
                                     await emitter.emit(
                                         f"处理页面 {processed_count}/{len(results)}",
                                     )
@@ -136,7 +136,7 @@ class Tools:
                             break
 
             except BaseException as e:
-                if self.valves.status:
+                if self.valves.STATUS:
                     await emitter.emit(
                         status="error",
                         description=f"处理时出错: {str(e)}",
@@ -163,7 +163,7 @@ class Tools:
         for result in results_json:
             urls.append(result["url"])
 
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(
                 status="complete",
                 description=f"搜索到 {len(results_json)} 个结果",
@@ -186,7 +186,7 @@ class Tools:
         """
         functions = HelpFunctions()
         emitter = EventEmitter(__event_emitter__)
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(f"正在从URL获取内容: {url}")
 
         results_json = []
@@ -212,7 +212,7 @@ class Tools:
                     },
                 }
             )
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(
                 status="complete", description="已成功检索和处理网站内容", done=True
             )
