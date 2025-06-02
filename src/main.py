@@ -29,10 +29,6 @@ class Tools:
             default=3,
             description="要分析的搜索引擎结果数",
         )
-        SCRAPPED_PAGES_NO: int = Field(
-            default=5,
-            description="已分页的总页数。理想情况下，大于返回的页面之一",
-        )
         PAGE_CONTENT_WORDS_LIMIT: int = Field(
             default=5000,
             description="限制每页的字数",
@@ -80,10 +76,6 @@ class Tools:
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
 
-        # Ensure RETURNED_SCRAPPED_PAGES_NO does not exceed SCRAPPED_PAGES_NO
-        if self.valves.RETURNED_SCRAPPED_PAGES_NO > self.valves.SCRAPPED_PAGES_NO:
-            self.valves.RETURNED_SCRAPPED_PAGES_NO = self.valves.SCRAPPED_PAGES_NO
-
         params = {
             "q": query,
             "format": "json",
@@ -100,9 +92,8 @@ class Tools:
             data = resp.json()
 
             results = data.get("results", [])
-            limited_results = results[: self.valves.SCRAPPED_PAGES_NO]
             if self.valves.status:
-                await emitter.emit(f"返回了 {len(limited_results)} 个搜索结果")
+                await emitter.emit(f"返回了 {len(results)} 个搜索结果")
 
         except requests.exceptions.RequestException as e:
             if self.valves.status:
@@ -114,7 +105,7 @@ class Tools:
             return json.dumps({"error": str(e)})
 
         results_json = []
-        if limited_results:
+        if results:
             if self.valves.status:
                 await emitter.emit("正在处理搜索结果")
 
@@ -124,7 +115,7 @@ class Tools:
                         executor.submit(
                             functions.process_search_result, result, self.valves
                         )
-                        for result in limited_results
+                        for result in results
                     ]
 
                     processed_count = 0
@@ -136,7 +127,7 @@ class Tools:
                                 processed_count += 1
                                 if self.valves.status:
                                     await emitter.emit(
-                                        f"处理页面 {processed_count}/{len(limited_results)}",
+                                        f"处理页面 {processed_count}/{len(results)}",
                                     )
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
