@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import ParseResult, urlparse
 
-from aiohttp import ClientSession, ClientError
+from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 
 
