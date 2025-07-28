@@ -2,17 +2,20 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.6.1
+version: 0.7.0
 license: MIT
 """
 
-import requests
+import asyncio
 import json
-import concurrent.futures
-from pydantic import BaseModel, Field
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
 
-from utils import HelpFunctions, EventEmitter
+import requests
+from aiohttp import ClientSession
+from pydantic import BaseModel, Field
+
+from utils import EventEmitter, HelpFunctions
 
 
 class Tools:
@@ -25,13 +28,9 @@ class Tools:
             default="",
             description="以逗号分隔的要忽略的网站列表",
         )
-        RETURNED_SCRAPPED_PAGES_NO: int = Field(
+        MAX_SEARCH_RESULTS: int = Field(
             default=3,
             description="要分析的搜索引擎结果数",
-        )
-        SCRAPPED_PAGES_NO: int = Field(
-            default=5,
-            description="已分页的总页数。理想情况下，大于返回的页面之一",
         )
         PAGE_CONTENT_WORDS_LIMIT: int = Field(
             default=5000,
@@ -49,7 +48,7 @@ class Tools:
             default=True,
             description="检索中的返回是否移除链接",
         )
-        status: bool = Field(
+        STATUS: bool = Field(
             default=True,
             description="如果为True，则发送状态",
         )
@@ -72,26 +71,22 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        functions = HelpFunctions()
+        functions = HelpFunctions(self.valves)
         emitter = EventEmitter(__event_emitter__)
 
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(f"正在搜索: {query}")
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
 
-        # Ensure RETURNED_SCRAPPED_PAGES_NO does not exceed SCRAPPED_PAGES_NO
-        if self.valves.RETURNED_SCRAPPED_PAGES_NO > self.valves.SCRAPPED_PAGES_NO:
-            self.valves.RETURNED_SCRAPPED_PAGES_NO = self.valves.SCRAPPED_PAGES_NO
-
         params = {
             "q": query,
             "format": "json",
-            "number_of_results": self.valves.RETURNED_SCRAPPED_PAGES_NO,
+            "number_of_results": self.valves.MAX_SEARCH_RESULTS,
         }
 
         try:
-            if self.valves.status:
+            if self.valves.STATUS:
                 await emitter.emit("正在向搜索引擎发送请求")
             resp = requests.get(
                 search_engine_url, params=params, headers=self.headers, timeout=120
@@ -100,12 +95,11 @@ class Tools:
             data = resp.json()
 
             results = data.get("results", [])
-            limited_results = results[: self.valves.SCRAPPED_PAGES_NO]
-            if self.valves.status:
-                await emitter.emit(f"返回了 {len(limited_results)} 个搜索结果")
+            if self.valves.STATUS:
+                await emitter.emit(f"返回了 {len(results)} 个搜索结果")
 
         except requests.exceptions.RequestException as e:
-            if self.valves.status:
+            if self.valves.STATUS:
                 await emitter.emit(
                     status="error",
                     description=f"搜索时出错: {str(e)}",
@@ -114,65 +108,67 @@ class Tools:
             return json.dumps({"error": str(e)})
 
         results_json = []
-        if limited_results:
-            if self.valves.status:
+        if results:
+            if self.valves.STATUS:
                 await emitter.emit("正在处理搜索结果")
 
             try:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    futures = [
-                        executor.submit(
-                            functions.process_search_result, result, self.valves
-                        )
-                        for result in limited_results
-                    ]
+                async with ClientSession() as session:
+                    tasks = asyncio.create_task(
+                        functions.process_search_result(result, session)
+                        for result in results
+                    )
 
-                    processed_count = 0
-                    for future in concurrent.futures.as_completed(futures):
-                        result_json = future.result()
+                processed_count = 0
+                while tasks and processed_count < len(results):
+                    done, pending = await asyncio.wait(
+                        tasks, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for task in done:
+                        result_json = await task.result()
                         if result_json:
                             try:
                                 results_json.append(result_json)
                                 processed_count += 1
-                                if self.valves.status:
+                                if self.valves.STATUS:
                                     await emitter.emit(
-                                        f"处理页面 {processed_count}/{len(limited_results)}",
+                                        f"处理页面 {processed_count}/{len(results)}",
                                     )
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
                                 continue
-                        if len(results_json) >= self.valves.RETURNED_SCRAPPED_PAGES_NO:
-                            break
+                    if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                        for task in pending:
+                            task.cancel()
 
             except BaseException as e:
-                if self.valves.status:
+                if self.valves.STATUS:
                     await emitter.emit(
                         status="error",
                         description=f"处理时出错: {str(e)}",
                         done=True,
                     )
 
-            results_json = results_json[: self.valves.RETURNED_SCRAPPED_PAGES_NO]
+            results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
-            if self.valves.CITATION_LINKS and __event_emitter__:
-                if len(results_json):
-                    for result in results_json:
-                        await __event_emitter__(
-                            {
-                                "type": "citation",
-                                "data": {
-                                    "document": [result["content"]],
-                                    "metadata": [{"source": result["url"]}],
-                                    "source": {"name": result["title"]},
-                                },
-                            }
-                        )
+            if self.valves.CITATION_LINKS and __event_emitter__ and len(results_json):
+                for result in results_json:
+                    await __event_emitter__(
+                        {
+                            "type": "citation",
+                            "data": {
+                                "document": [result["content"]],
+                                "metadata": [{"source": result["url"]}],
+                                "source": {"name": result["title"]},
+                            },
+                        }
+                    )
 
         urls = []
         for result in results_json:
             urls.append(result["url"])
 
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(
                 status="complete",
                 description=f"搜索到 {len(results_json)} 个结果",
@@ -193,17 +189,17 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        functions = HelpFunctions()
+        functions = HelpFunctions(self.valves)
         emitter = EventEmitter(__event_emitter__)
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(f"正在从URL获取内容: {url}")
 
         results_json = []
 
         if url.strip() == "":
             return ""
-
-        result_site = functions.fetch_and_process_page(url, self.valves)
+        async with ClientSession() as session:
+            result_site = await functions.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
         if (
@@ -221,7 +217,7 @@ class Tools:
                     },
                 }
             )
-        if self.valves.status:
+        if self.valves.STATUS:
             await emitter.emit(
                 status="complete", description="已成功检索和处理网站内容", done=True
             )

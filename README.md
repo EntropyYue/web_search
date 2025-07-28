@@ -14,7 +14,7 @@
 
 ## 使用方法
 
-打开/workspace/tools/create，粘贴web-search.py内的内容
+从[此处](https://github.com/EntropyYue/web_search/releases)下载`plugin.py`文件，并将其粘贴到`{open-webui-url}/workspace/tools/create`中。
 
 ## 来源
 
