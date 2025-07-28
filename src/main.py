@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.7.0
+version: 0.7.1
 license: MIT
 """
 
