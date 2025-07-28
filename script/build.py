@@ -1,6 +1,6 @@
 import ast
-import os
 import json
+import os
 
 
 def replace_imports(
@@ -24,7 +24,7 @@ def replace_imports(
     for module_name in modules:
         file_path = f"src/{module_name}.py"
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 code = f.read()
             ast_module = ast.parse(code, filename=file_path)
             preloaded_modules[module_name] = ast_module
@@ -33,7 +33,7 @@ def replace_imports(
 
     # 读取并解析主文件内容
     try:
-        with open(main_file_path, "r", encoding="utf-8") as f:
+        with open(main_file_path, encoding="utf-8") as f:
             main_code = f.read()
         main_ast = ast.parse(main_code, filename=main_file_path)
     except Exception as e:
@@ -100,7 +100,7 @@ def replace_imports(
 
 
 if __name__ == "__main__":
-    with open("modules.json", "r") as f:
+    with open("modules.json") as f:
         preloaded_modules = json.load(f)
     replace_imports(
         modules=preloaded_modules,
