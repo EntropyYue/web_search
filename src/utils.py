@@ -4,8 +4,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import ParseResult, urlparse
 
-import requests
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientError
 from bs4 import BeautifulSoup
 
 
@@ -64,10 +63,10 @@ class HelpFunctions:
                 "url": url,
                 "content": truncated_content,
             }
-        except requests.exceptions.RequestException as e:
+        except BaseException as e:
             return {
                 "url": url,
-                "content": f"检索页面失败,错误: {str(e)}",
+                "content": f"检索页面失败, 错误: {str(e)}",
             }
 
     async def process_search_result(

@@ -11,8 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-import requests
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientError
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, HelpFunctions
@@ -88,17 +87,18 @@ class Tools:
         try:
             if self.valves.STATUS:
                 await emitter.emit("正在向搜索引擎发送请求")
-            resp = requests.get(
-                search_engine_url, params=params, headers=self.headers, timeout=120
-            )
+            async with ClientSession() as session:
+                resp = await session.get(
+                    search_engine_url, params=params, headers=self.headers
+                )
             resp.raise_for_status()
-            data = resp.json()
+            data = await resp.json()
 
             results = data.get("results", [])
             if self.valves.STATUS:
                 await emitter.emit(f"返回了 {len(results)} 个搜索结果")
 
-        except requests.exceptions.RequestException as e:
+        except ClientError as e:
             if self.valves.STATUS:
                 await emitter.emit(
                     status="error",
@@ -114,32 +114,36 @@ class Tools:
 
             try:
                 async with ClientSession() as session:
-                    tasks = asyncio.create_task(
-                        functions.process_search_result(result, session)
+                    tasks = [
+                        asyncio.create_task(
+                            functions.process_search_result(result, session)
+                        )
                         for result in results
-                    )
+                    ]
 
-                processed_count = 0
-                while tasks and processed_count < len(results):
-                    done, pending = await asyncio.wait(
-                        tasks, return_when=asyncio.FIRST_COMPLETED
-                    )
-                    for task in done:
-                        result_json = await task.result()
-                        if result_json:
-                            try:
-                                results_json.append(result_json)
-                                processed_count += 1
-                                if self.valves.STATUS:
-                                    await emitter.emit(
-                                        f"处理页面 {processed_count}/{len(results)}",
-                                    )
-                            except (TypeError, ValueError, Exception) as e:
-                                print(f"处理时出错: {str(e)}")
-                                continue
-                    if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                        for task in pending:
-                            task.cancel()
+                    processed_count = 0
+                    while tasks and processed_count < len(results):
+                        try:
+                            done, pending = await asyncio.wait(
+                                tasks, return_when=asyncio.FIRST_COMPLETED
+                            )
+                        except BaseException:
+                            continue
+                        for task in done:
+                            result_json = await task
+                            if result_json:
+                                try:
+                                    results_json.append(result_json)
+                                    processed_count += 1
+                                    if self.valves.STATUS:
+                                        await emitter.emit(
+                                            f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
+                                        )
+                                except (TypeError, ValueError, Exception) as e:
+                                    continue
+                        if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                            for task in pending:
+                                task.cancel()
 
             except BaseException as e:
                 if self.valves.STATUS:
