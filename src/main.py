@@ -68,7 +68,7 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        functions = HelpFunctions()
+        functions = HelpFunctions(self.valves)
         emitter = EventEmitter(__event_emitter__)
 
         if self.valves.STATUS:
@@ -113,7 +113,7 @@ class Tools:
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     futures = [
                         executor.submit(
-                            functions.process_search_result, result, self.valves
+                            functions.process_search_result, result
                         )
                         for result in results
                     ]
@@ -184,7 +184,7 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        functions = HelpFunctions()
+        functions = HelpFunctions(self.valves)
         emitter = EventEmitter(__event_emitter__)
         if self.valves.STATUS:
             await emitter.emit(f"正在从URL获取内容: {url}")
@@ -194,7 +194,7 @@ class Tools:
         if url.strip() == "":
             return ""
 
-        result_site = functions.fetch_and_process_page(url, self.valves)
+        result_site = functions.fetch_and_process_page(url)
         results_json.append(result_site)
 
         if (
