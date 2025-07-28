@@ -25,7 +25,7 @@ class Tools:
             default="",
             description="以逗号分隔的要忽略的网站列表",
         )
-        RETURNED_SCRAPPED_PAGES_NO: int = Field(
+        MAX_SEARCH_RESULTS: int = Field(
             default=3,
             description="要分析的搜索引擎结果数",
         )
@@ -79,7 +79,7 @@ class Tools:
         params = {
             "q": query,
             "format": "json",
-            "number_of_results": self.valves.RETURNED_SCRAPPED_PAGES_NO,
+            "number_of_results": self.valves.MAX_SEARCH_RESULTS,
         }
 
         try:
@@ -132,7 +132,7 @@ class Tools:
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
                                 continue
-                        if len(results_json) >= self.valves.RETURNED_SCRAPPED_PAGES_NO:
+                        if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
                             break
 
             except BaseException as e:
@@ -143,7 +143,7 @@ class Tools:
                         done=True,
                     )
 
-            results_json = results_json[: self.valves.RETURNED_SCRAPPED_PAGES_NO]
+            results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
             if self.valves.CITATION_LINKS and __event_emitter__:
                 if len(results_json):

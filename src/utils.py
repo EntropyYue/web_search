@@ -20,9 +20,9 @@ class HelpFunctions:
 
     def format_text(self, original_text: str) -> str:
         soup = BeautifulSoup(original_text, "html.parser")
-        formatted_text = soup.get_text(separator=" ", strip=True)
+        formatted_text = soup.get_text(separator="\n", strip=True)
         formatted_text = unicodedata.normalize("NFKC", formatted_text)
-        formatted_text = re.sub(r"\s+", " ", formatted_text)
+        formatted_text = re.sub(r"[ \t]+", " ", formatted_text)
         formatted_text = formatted_text.strip()
         formatted_text = self.remove_emojis(formatted_text)
         if self.valves.REMOVE_LINKS:
@@ -53,7 +53,7 @@ class HelpFunctions:
             page_title = unicodedata.normalize("NFKC", page_title.strip())
             page_title = self.remove_emojis(page_title)
 
-            content_site = self.format_text(soup.get_text(separator=" ", strip=True))
+            content_site = self.format_text(soup.get_text(separator="\n", strip=True))
             truncated_content = self.truncate_to_n_words(
                 content_site, self.valves.PAGE_CONTENT_WORDS_LIMIT
             )
