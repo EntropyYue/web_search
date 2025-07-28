@@ -132,18 +132,15 @@ class Tools:
                         for task in done:
                             result_json = await task
                             if result_json:
-                                try:
-                                    results_json.append(result_json)
-                                    processed_count += 1
-                                    if self.valves.STATUS:
-                                        await emitter.emit(
-                                            f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
-                                        )
-                                except (TypeError, ValueError, Exception) as e:
-                                    continue
-                        if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                            for task in pending:
-                                task.cancel()
+                                results_json.append(result_json)
+                                processed_count += 1
+                                if self.valves.STATUS:
+                                    await emitter.emit(
+                                        f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
+                                    )
+                            if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                                for task in pending:
+                                    task.cancel()
 
             except BaseException as e:
                 if self.valves.STATUS:
