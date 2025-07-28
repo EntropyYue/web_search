@@ -1,9 +1,12 @@
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urlparse, ParseResult
 import re
 import unicodedata
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
+from urllib.parse import ParseResult, urlparse
+
+import requests
+from aiohttp import ClientSession
+from bs4 import BeautifulSoup
 
 
 class HelpFunctions:
@@ -36,14 +39,13 @@ class HelpFunctions:
         pattern = r"\(https?://[^\s]+\)"
         return re.sub(pattern, replacement, text)
 
-    def fetch_and_process_page(self, url: str) -> dict[str, str]:
+    async def fetch_and_process_page(
+        self, url: str, session: ClientSession
+    ) -> dict[str, str]:
         try:
-            response_site = requests.get(
-                self.valves.JINA_READER_BASE_URL + url, timeout=20
-            )
-            response_site.encoding = response_site.apparent_encoding
+            response_site = await session.get(self.valves.JINA_READER_BASE_URL + url)
             response_site.raise_for_status()
-            html_content = response_site.text
+            html_content = await response_site.text()
             soup = BeautifulSoup(html_content, "html.parser")
             page_title = (
                 soup.title.string
@@ -68,7 +70,9 @@ class HelpFunctions:
                 "content": f"检索页面失败,错误: {str(e)}",
             }
 
-    def process_search_result(self, result: dict[str, str]) -> dict[str, str] | None:
+    async def process_search_result(
+        self, result: dict[str, str], session: ClientSession
+    ) -> dict[str, str] | None:
         self.remove_emojis(result["title"])
         url_site = result["url"]
         snippet = result.get("content", "")
@@ -80,7 +84,7 @@ class HelpFunctions:
             ):
                 return None
 
-        result_data = self.fetch_and_process_page(url_site)
+        result_data = await self.fetch_and_process_page(url_site, session)
         if "content" in result_data and "检索页面失败" not in result_data["content"]:
             result_data["snippet"] = self.remove_emojis(snippet)
             return result_data
@@ -102,7 +106,7 @@ class EventEmitter:
         status="in_progress",
         done=False,
         action="",
-        urls=[],
+        urls=None,
     ):
         if self.event_emitter:
             await self.event_emitter(

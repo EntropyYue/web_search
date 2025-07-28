@@ -6,13 +6,16 @@ version: 0.6.1
 license: MIT
 """
 
-import requests
+import asyncio
 import json
-import concurrent.futures
-from pydantic import BaseModel, Field
-from typing import Callable, Any
+from collections.abc import Callable
+from typing import Any
 
-from utils import HelpFunctions, EventEmitter
+import requests
+from aiohttp import ClientSession
+from pydantic import BaseModel, Field
+
+from utils import EventEmitter, HelpFunctions
 
 
 class Tools:
@@ -110,17 +113,19 @@ class Tools:
                 await emitter.emit("正在处理搜索结果")
 
             try:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    futures = [
-                        executor.submit(
-                            functions.process_search_result, result
-                        )
+                async with ClientSession() as session:
+                    tasks = asyncio.create_task(
+                        functions.process_search_result(result, session)
                         for result in results
-                    ]
+                    )
 
-                    processed_count = 0
-                    for future in concurrent.futures.as_completed(futures):
-                        result_json = future.result()
+                processed_count = 0
+                while tasks and processed_count < len(results):
+                    done, pending = await asyncio.wait(
+                        tasks, return_when=asyncio.FIRST_COMPLETED
+                    )
+                    for task in done:
+                        result_json = await task.result()
                         if result_json:
                             try:
                                 results_json.append(result_json)
@@ -132,8 +137,9 @@ class Tools:
                             except (TypeError, ValueError, Exception) as e:
                                 print(f"处理时出错: {str(e)}")
                                 continue
-                        if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                            break
+                    if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                        for task in pending:
+                            task.cancel()
 
             except BaseException as e:
                 if self.valves.STATUS:
@@ -145,19 +151,18 @@ class Tools:
 
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
-            if self.valves.CITATION_LINKS and __event_emitter__:
-                if len(results_json):
-                    for result in results_json:
-                        await __event_emitter__(
-                            {
-                                "type": "citation",
-                                "data": {
-                                    "document": [result["content"]],
-                                    "metadata": [{"source": result["url"]}],
-                                    "source": {"name": result["title"]},
-                                },
-                            }
-                        )
+            if self.valves.CITATION_LINKS and __event_emitter__ and len(results_json):
+                for result in results_json:
+                    await __event_emitter__(
+                        {
+                            "type": "citation",
+                            "data": {
+                                "document": [result["content"]],
+                                "metadata": [{"source": result["url"]}],
+                                "source": {"name": result["title"]},
+                            },
+                        }
+                    )
 
         urls = []
         for result in results_json:
@@ -193,8 +198,8 @@ class Tools:
 
         if url.strip() == "":
             return ""
-
-        result_site = functions.fetch_and_process_page(url)
+        async with ClientSession() as session:
+            result_site = await functions.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
         if (
