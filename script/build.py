@@ -67,12 +67,15 @@ def replace_imports(
 
             elif isinstance(node, ast.ImportFrom):
                 module_name = node.module
-                if module_name in modules and module_name not in processed_modules:
-                    if module_name in preloaded_modules:
-                        target_body = preloaded_modules[module_name].body
-                        main_ast.body[i : i + 1] = target_body  # 替换导入语句为模块内容
-                        processed_modules.add(module_name)
-                        found_new_module = True
+                if (
+                    module_name in modules
+                    and module_name not in processed_modules
+                    and module_name in preloaded_modules
+                ):
+                    target_body = preloaded_modules[module_name].body
+                    main_ast.body[i : i + 1] = target_body  # 替换导入语句为模块内容
+                    processed_modules.add(module_name)
+                    found_new_module = True
 
         # 如果本轮没有发现新的可替换的模块，退出循环
         if not found_new_module:
