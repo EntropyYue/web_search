@@ -104,47 +104,50 @@ class Tools:
             return json.dumps({"error": str(e)})
 
         results_json: list[dict[str, str]] = []
-        if results:
-            if self.valves.STATUS:
-                await emitter.emit("正在处理搜索结果")
+        if not results:
+            return json.dumps({"error": "未找到搜索结果"}, indent=4, ensure_ascii=False)
 
-            try:
-                async with ClientSession() as session:
-                    tasks = [
-                        asyncio.create_task(
-                            functions.process_search_result(result, session)
-                        )
-                        for result in results
-                    ]
+        if self.valves.STATUS:
+            await emitter.emit("正在处理搜索结果")
 
-                    processed_count = 0
-                    while tasks and processed_count < len(results):
-                        try:
-                            done, pending = await asyncio.wait(
-                                tasks, return_when=asyncio.FIRST_COMPLETED
-                            )
-                        except BaseException:
-                            continue
-                        for task in done:
-                            result_json = await task
-                            if result_json:
-                                results_json.append(result_json)
-                                processed_count += 1
-                                if self.valves.STATUS:
-                                    await emitter.emit(
-                                        f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
-                                    )
-                            if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                                for task in pending:
-                                    task.cancel()
-
-            except BaseException as e:
-                if self.valves.STATUS:
-                    await emitter.emit(
-                        status="error",
-                        description=f"处理时出错: {str(e)}",
-                        done=True,
+        try:
+            async with ClientSession() as session:
+                tasks = [
+                    asyncio.create_task(
+                        functions.process_search_result(result, session)
                     )
+                    for result in results
+                ]
+
+                processed_count = 0
+                while tasks and processed_count < len(results):
+                    try:
+                        done, pending = await asyncio.wait(
+                            tasks, return_when=asyncio.FIRST_COMPLETED
+                        )
+                    except BaseException:
+                        continue
+                    for task in done:
+                        result_json = await task
+                        if not result_json:
+                            continue
+                        results_json.append(result_json)
+                        processed_count += 1
+                        if self.valves.STATUS:
+                            await emitter.emit(
+                                f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
+                            )
+                        if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                            for task in pending:
+                                task.cancel()
+
+        except BaseException as e:
+            if self.valves.STATUS:
+                await emitter.emit(
+                    status="error",
+                    description=f"处理时出错: {str(e)}",
+                    done=True,
+                )
 
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
