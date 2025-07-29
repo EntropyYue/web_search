@@ -67,7 +67,7 @@ class Tools:
         :return: The content of the pages in json format.
         """
         functions = HelpFunctions(self.valves, self.headers)
-        emitter = EventEmitter(__event_emitter__)
+        emitter = EventEmitter(self.valves, __event_emitter__)
 
         await emitter.status(f"正在搜索: {query}")
 
@@ -173,7 +173,7 @@ class Tools:
         :return: The content of the website in json format.
         """
         functions = HelpFunctions(self.valves, self.headers)
-        emitter = EventEmitter(__event_emitter__)
+        emitter = EventEmitter(self.valves, __event_emitter__)
         await emitter.status(f"正在从URL获取内容: {url}")
 
         results_json = []
