@@ -103,7 +103,7 @@ class Tools:
                 )
             return json.dumps({"error": str(e)})
 
-        results_json = []
+        results_json: list[dict[str, str]] = []
         if results:
             if self.valves.STATUS:
                 await emitter.emit("正在处理搜索结果")
@@ -161,7 +161,7 @@ class Tools:
                         }
                     )
 
-        urls = []
+        urls: list[str] = []
         for result in results_json:
             urls.append(result["url"])
 
@@ -200,7 +200,8 @@ class Tools:
         results_json.append(result_site)
 
         if (
-            self.valves.CITATION_LINKS
+            result_site
+            and self.valves.CITATION_LINKS
             and "content" in result_site
             and __event_emitter__
         ):

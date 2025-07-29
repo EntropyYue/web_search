@@ -4,103 +4,107 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import ParseResult, urlparse
 
-from aiohttp import ClientSession
+from aiohttp import ClientError, ClientSession
 from bs4 import BeautifulSoup
 from tiktoken import get_encoding
 
 
-class HelpFunctions:
-    def __init__(self, value, header) -> None:
-        self.valves = value
-        self.header = header
+class PageCleaner:
+    def __init__(self, remove_links: bool = True, token_limit: int = 1000):
+        self.remove_links = remove_links
+        self.token_limit = token_limit
         self.tokenizer = get_encoding("cl100k_base")
+        self.invisible_chars = ["\ufeff", "\u200b", "\u2028", "\u2060"]
+
+    def extract_title(self, soup: BeautifulSoup) -> str:
+        title = (
+            soup.title.string if soup.title and soup.title.string else "No title found"
+        )
+        return self._normalize_text(title)
+
+    def extract_text(self, soup: BeautifulSoup) -> str:
+        return soup.get_text(separator="\n", strip=True)
+
+    def clean_text(self, text: str) -> str:
+        text = unicodedata.normalize("NFKC", text)
+        text = re.sub(r"[ \t]+", " ", text)
+        if self.remove_links:
+            text = re.sub(r"\(https?://[^\s]+\)", "(links)", text)
+        text = self._remove_emojis(text)
+        text = self._remove_invisible_chars(text)
+        return text.strip()
+
+    def truncate_tokens(self, text: str) -> str:
+        tokens = self.tokenizer.encode(text)
+        truncated = self.tokenizer.decode(tokens[: self.token_limit])
+        return self._remove_invisible_chars(truncated).strip()
+
+    def _normalize_text(self, text: str) -> str:
+        return unicodedata.normalize("NFKC", text).strip()
+
+    def _remove_emojis(self, text: str) -> str:
+        return "".join(c for c in text if not unicodedata.category(c).startswith("So"))
+
+    def _remove_invisible_chars(self, text: str) -> str:
+        for ch in self.invisible_chars:
+            text = text.replace(ch, "")
+        return text
+
+
+class HelpFunctions:
+    def __init__(self, valves, headers) -> None:
+        self.valves = valves
+        self.headers = headers
+        self.cleaner = PageCleaner(
+            remove_links=valves.REMOVE_LINKS,
+            token_limit=valves.PAGE_CONTENT_WORDS_LIMIT,
+        )
 
     def get_base_url(self, url: str) -> str:
         parsed_url: ParseResult = urlparse(url)
-        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        return base_url
-
-    def format_text(self, original_text: str) -> str:
-        soup = BeautifulSoup(original_text, "html.parser")
-        formatted_text = soup.get_text(separator="\n", strip=True)
-        formatted_text = unicodedata.normalize("NFKC", formatted_text)
-        formatted_text = re.sub(r"[ \t]+", " ", formatted_text)
-        formatted_text = formatted_text.strip()
-        formatted_text = self.remove_emojis(formatted_text)
-        if self.valves.REMOVE_LINKS:
-            formatted_text = self.replace_urls_with_text(formatted_text)
-        return formatted_text
-
-    def remove_emojis(self, text: str) -> str:
-        return "".join(c for c in text if not unicodedata.category(c).startswith("So"))
-
-    def replace_urls_with_text(self, text: str, replacement="(links)") -> str:
-        pattern = r"\(https?://[^\s]+\)"
-        return re.sub(pattern, replacement, text)
+        return f"{parsed_url.scheme}://{parsed_url.netloc}"
 
     async def fetch_and_process_page(
         self, url: str, session: ClientSession
     ) -> dict[str, str]:
         try:
-            response_site = await session.get(url, headers=self.header)
-            response_site.raise_for_status()
-            html_content = await response_site.text()
-            soup = BeautifulSoup(html_content, "html.parser")
-            page_title = (
-                soup.title.string
-                if soup.title and soup.title.string
-                else "No title found"
-            )
-            page_title = unicodedata.normalize("NFKC", page_title.strip())
-            page_title = self.remove_emojis(page_title)
+            async with session.get(url, headers=self.headers) as response:
+                response.raise_for_status()
+                html = await response.text()
+        except ClientError as e:
+            return {"url": url, "error": f"检索页面失败, 网络错误: {str(e)}"}
+        except Exception as e:
+            return {"url": url, "error": f"检索页面失败: {str(e)}"}
 
-            content_site = self.format_text(soup.get_text(separator="\n", strip=True))
-            truncated_content = self.truncate_to_n_words(
-                content_site, self.valves.PAGE_CONTENT_WORDS_LIMIT
-            )
-            return {
-                "title": page_title,
-                "url": url,
-                "content": truncated_content,
-            }
-        except BaseException as e:
-            return {
-                "url": url,
-                "content": f"检索页面失败, 错误: {str(e)}",
-            }
+        soup = BeautifulSoup(html, "html.parser")
+        title = self.cleaner.extract_title(soup)
+        raw_text = self.cleaner.extract_text(soup)
+        clean_text = self.cleaner.clean_text(raw_text)
+        truncated = self.cleaner.truncate_tokens(clean_text)
+
+        return {
+            "title": title,
+            "url": url,
+            "content": truncated,
+        }
 
     async def process_search_result(
         self, result: dict[str, str], session: ClientSession
     ) -> dict[str, str] | None:
-        self.remove_emojis(result["title"])
-        url_site = result["url"]
+        url = result["url"]
         snippet = result.get("content", "")
 
         if self.valves.IGNORED_WEBSITES:
-            base_url = self.get_base_url(url_site)
-            if any(
-                ignored_site.strip() in base_url
-                for ignored_site in self.valves.IGNORED_WEBSITES.split(",")
-            ):
+            base_url = self.get_base_url(url)
+            ignored_sites = [s.strip() for s in self.valves.IGNORED_WEBSITES.split(",")]
+            if any(site in base_url for site in ignored_sites):
                 return None
 
-        result_data = await self.fetch_and_process_page(url_site, session)
-        if "content" in result_data and "检索页面失败" not in result_data["content"]:
-            result_data["snippet"] = self.remove_emojis(snippet)
+        result_data = await self.fetch_and_process_page(url, session)
+        if "content" in result_data and "error" not in result_data:
+            result_data["snippet"] = self.cleaner._remove_emojis(snippet)
             return result_data
         return None
-
-    def clean_invisible_chars(self, text: str) -> str:
-        invisible = ["\ufeff", "\u200b", "\u2028", "\u2060"]
-        for ch in invisible:
-            text = text.replace(ch, "")
-        return text.lstrip()
-
-    def truncate_to_n_words(self, text: str, token_limit: int) -> str:
-        tokens = self.tokenizer.encode(text)
-        truncated_tokens = tokens[:token_limit]
-        deocoded_tokens = self.tokenizer.decode(truncated_tokens)
-        return self.clean_invisible_chars(deocoded_tokens)
 
 
 class EventEmitter:
@@ -109,22 +113,24 @@ class EventEmitter:
 
     async def emit(
         self,
-        description="未知状态",
-        status="in_progress",
-        done=False,
-        action="",
-        urls=None,
-    ):
-        if self.event_emitter:
-            await self.event_emitter(
-                {
-                    "type": "status",
-                    "data": {
-                        "status": status,
-                        "description": description,
-                        "done": done,
-                        "action": action,
-                        "urls": urls,
-                    },
-                }
-            )
+        description: str = "未知状态",
+        status: str = "in_progress",
+        done: bool = False,
+        action: str = "",
+        urls: list[str] | None = None,
+    ) -> None:
+        if not self.event_emitter:
+            return
+
+        payload: dict[str, Any] = {
+            "type": "status",
+            "data": {
+                "status": status,
+                "description": description,
+                "done": done,
+                "action": action,
+                "urls": urls,
+            },
+        }
+
+        await self.event_emitter(payload)
