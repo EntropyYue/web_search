@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 7.3
+version: 7.4
 license: MIT
 """
 
@@ -69,8 +69,7 @@ class Tools:
         functions = HelpFunctions(self.valves, self.headers)
         emitter = EventEmitter(__event_emitter__)
 
-        if self.valves.STATUS:
-            await emitter.emit(f"正在搜索: {query}")
+        await emitter.status(f"正在搜索: {query}")
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
 
@@ -81,8 +80,7 @@ class Tools:
         }
 
         try:
-            if self.valves.STATUS:
-                await emitter.emit("正在向搜索引擎发送请求")
+            await emitter.status("正在向搜索引擎发送请求")
             async with ClientSession() as session:
                 resp = await session.get(
                     search_engine_url, params=params, headers=self.headers
@@ -90,92 +88,77 @@ class Tools:
                 resp.raise_for_status()
                 data = await resp.json()
 
-            results = data.get("results", [])
-            if self.valves.STATUS:
-                await emitter.emit(f"返回了 {len(results)} 个搜索结果")
-
         except ClientError as e:
-            if self.valves.STATUS:
-                await emitter.emit(
-                    status="error",
-                    description=f"搜索时出错: {str(e)}",
-                    done=True,
-                )
+            await emitter.status(
+                status="error",
+                description=f"搜索时出错: {str(e)}",
+                done=True,
+            )
             return json.dumps({"error": str(e)})
+
+        results = data.get("results", [])
+        await emitter.status(f"返回了 {len(results)} 个搜索结果")
 
         results_json: list[dict[str, str]] = []
         if not results:
-            return json.dumps({"error": "未找到搜索结果"}, indent=4, ensure_ascii=False)
+            return json.dumps(
+                {"error": "No search results found"}, indent=4, ensure_ascii=False
+            )
 
-        if self.valves.STATUS:
-            await emitter.emit("正在处理搜索结果")
+        await emitter.status("正在处理搜索结果")
 
-        try:
-            async with ClientSession() as session:
-                tasks = [
-                    asyncio.create_task(
-                        functions.process_search_result(result, session)
+        async with ClientSession() as session:
+            tasks = [
+                asyncio.create_task(functions.process_search_result(result, session))
+                for result in results
+            ]
+
+            processed_count = 0
+            while tasks and processed_count < len(results):
+                try:
+                    done, pending = await asyncio.wait(
+                        tasks, return_when=asyncio.FIRST_COMPLETED
                     )
-                    for result in results
-                ]
-
-                processed_count = 0
-                while tasks and processed_count < len(results):
-                    try:
-                        done, pending = await asyncio.wait(
-                            tasks, return_when=asyncio.FIRST_COMPLETED
-                        )
-                    except BaseException:
+                except BaseException:
+                    continue
+                for task in done:
+                    result_json = await task
+                    if not result_json:
                         continue
-                    for task in done:
-                        result_json = await task
-                        if not result_json:
-                            continue
-                        results_json.append(result_json)
-                        processed_count += 1
-                        if self.valves.STATUS:
-                            await emitter.emit(
-                                f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
-                            )
-                        if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                            for task in pending:
-                                task.cancel()
-
-        except BaseException as e:
-            if self.valves.STATUS:
-                await emitter.emit(
-                    status="error",
-                    description=f"处理时出错: {str(e)}",
-                    done=True,
-                )
+                    results_json.append(result_json)
+                    processed_count += 1
+                    await emitter.status(
+                        f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
+                    )
+                    if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                        for task in pending:
+                            task.cancel()
 
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
-            if self.valves.CITATION_LINKS and __event_emitter__ and len(results_json):
-                for result in results_json:
-                    await __event_emitter__(
-                        {
-                            "type": "citation",
-                            "data": {
-                                "document": [result["content"]],
-                                "metadata": [{"source": result["url"]}],
-                                "source": {"name": result["title"]},
-                            },
-                        }
-                    )
+            if not len(results_json):
+                return json.dumps(
+                    {"error": "No fetched results found"}, indent=4, ensure_ascii=False
+                )
+
+            for result in results_json:
+                await emitter.citation(
+                    document=[result["content"]],
+                    metadata=[{"source": result["url"]}],
+                    source={"name": result["title"]},
+                )
 
         urls: list[str] = []
         for result in results_json:
             urls.append(result["url"])
 
-        if self.valves.STATUS:
-            await emitter.emit(
-                status="complete",
-                description=f"搜索到 {len(results_json)} 个结果",
-                done=True,
-                action="web_search",
-                urls=urls,
-            )
+        await emitter.status(
+            status="complete",
+            description=f"搜索到 {len(results_json)} 个结果",
+            done=True,
+            action="web_search",
+            urls=urls,
+        )
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
 
@@ -191,8 +174,7 @@ class Tools:
         """
         functions = HelpFunctions(self.valves, self.headers)
         emitter = EventEmitter(__event_emitter__)
-        if self.valves.STATUS:
-            await emitter.emit(f"正在从URL获取内容: {url}")
+        await emitter.status(f"正在从URL获取内容: {url}")
 
         results_json = []
 
@@ -218,8 +200,7 @@ class Tools:
                     },
                 }
             )
-        if self.valves.STATUS:
-            await emitter.emit(
-                status="complete", description="已成功获取网站内容", done=True
-            )
+        await emitter.status(
+            status="complete", description="已成功获取网站内容", done=True
+        )
         return json.dumps(results_json, indent=4, ensure_ascii=False)

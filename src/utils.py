@@ -108,29 +108,50 @@ class HelpFunctions:
 
 
 class EventEmitter:
-    def __init__(self, event_emitter: Callable[[dict], Any] | None = None):
+    def __init__(self, valves, event_emitter: Callable[[dict], Any] | None = None):
+        self.valves = valves
         self.event_emitter = event_emitter
 
-    async def emit(
+    async def emit(self, payload: dict[str, Any]) -> None:
+        if not self.event_emitter:
+            return
+
+        await self.event_emitter(payload)
+
+    async def status(
         self,
         description: str = "未知状态",
         status: str = "in_progress",
         done: bool = False,
-        action: str = "",
+        action: str | None = "",
         urls: list[str] | None = None,
     ) -> None:
-        if not self.event_emitter:
+        if self.valves.STATUS is False:
             return
 
-        payload: dict[str, Any] = {
+        payload = {
             "type": "status",
             "data": {
-                "status": status,
                 "description": description,
+                "status": status,
                 "done": done,
                 "action": action,
                 "urls": urls,
             },
         }
+        await self.emit(payload)
 
-        await self.event_emitter(payload)
+    async def citation(
+        self,
+        document: list[str],
+        metadata: list[dict[str, str]],
+        source: dict[str, str],
+    ) -> None:
+        if self.valves.CITATION_LINKS is False:
+            return
+
+        payload = {
+            "type": "citation",
+            "data": {"document": document, "metadata": metadata, "source": source},
+        }
+        await self.emit(payload)
