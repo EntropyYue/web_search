@@ -2,7 +2,7 @@
 
 ## 简介
 
-`web_search` 是一个使用 SearXNG 搜索并爬取网页的 open-webui 工具，它还有用一个用于爬取指定网页的函数。它能够从搜索引擎中获取搜索结果，并处理这些结果以提取所需的信息。此工具使用jina-reader读取网页。并使用了线程池发送请求
+`web_search` 是一个使用 SearXNG 搜索并爬取网页的 open-webui 工具，它还有用一个用于爬取指定网页的函数。支持网页内容抓取与清洗、自定义过滤和引用输出，适用于信息查询、知识检索、数据预处理等场景。
 
 ## 功能
 
@@ -14,12 +14,23 @@
 
 ## 使用方法
 
-从[此处](https://github.com/EntropyYue/web_search/releases)下载`plugin.py`文件，并将其粘贴到`{open-webui-url}/workspace/tools/create`中。
+从[Releases 页面](https://github.com/EntropyYue/web_search/releases)下载`plugin.py`文件，并将其内容粘贴到`/workspace/tools/create`中
 
-## 来源
+## 许可协议
 
-此工具的原始代码来自[此处](https://openwebui.com/t/constliakos/web_search)
+[MIT License](LICENSE)
 
-## 贡献
+## 贡献指南
 
-如果你有任何建议或改进意见，欢迎通过 GitHub 提交 Pull Request 或创建 Issue 与我们分享。感谢你的贡献！
+我们欢迎一切形式的贡献，包括但不限于：
+
+* 修复 Bug
+* 添加新功能
+* 优化已有功能
+* 改进文档
+
+请通过 [Issues](https://github.com/EntropyYue/web_search/issues) 或 Pull Request 与我们联系。
+
+## 联系方式
+
+如果你有任何疑问或建议，欢迎通过 GitHub Issue 与我们联系。
