@@ -1,0 +1,31 @@
+[project]
+name = "web-search"
+version = "0.7.2"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aiohttp>=3.12.14",
+    "beautifulsoup4>=4.13.4",
+    "pydantic>=2.11.7",
+    "tiktoken>=0.9.0",
+    "pydantic>=2.11.7",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]

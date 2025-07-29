@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 0.7.1
+version: 0.7.2
 license: MIT
 """
 
@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from aiohttp import ClientSession, ClientError
+from aiohttp import ClientError, ClientSession
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, HelpFunctions
@@ -38,10 +38,6 @@ class Tools:
         CITATION_LINKS: bool = Field(
             default=False,
             description="如果为True，则发送带有链接的自定义引用",
-        )
-        JINA_READER_BASE_URL: str = Field(
-            default="",
-            description="Jina Reader的基础URL，使用默认参数以关闭",
         )
         REMOVE_LINKS: bool = Field(
             default=True,
@@ -70,7 +66,7 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        functions = HelpFunctions(self.valves)
+        functions = HelpFunctions(self.valves, self.headers)
         emitter = EventEmitter(__event_emitter__)
 
         if self.valves.STATUS:
@@ -91,8 +87,8 @@ class Tools:
                 resp = await session.get(
                     search_engine_url, params=params, headers=self.headers
                 )
-            resp.raise_for_status()
-            data = await resp.json()
+                resp.raise_for_status()
+                data = await resp.json()
 
             results = data.get("results", [])
             if self.valves.STATUS:
@@ -107,7 +103,7 @@ class Tools:
                 )
             return json.dumps({"error": str(e)})
 
-        results_json = []
+        results_json: list[dict[str, str]] = []
         if results:
             if self.valves.STATUS:
                 await emitter.emit("正在处理搜索结果")
@@ -165,7 +161,7 @@ class Tools:
                         }
                     )
 
-        urls = []
+        urls: list[str] = []
         for result in results_json:
             urls.append(result["url"])
 
@@ -190,7 +186,7 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        functions = HelpFunctions(self.valves)
+        functions = HelpFunctions(self.valves, self.headers)
         emitter = EventEmitter(__event_emitter__)
         if self.valves.STATUS:
             await emitter.emit(f"正在从URL获取内容: {url}")
@@ -204,7 +200,8 @@ class Tools:
         results_json.append(result_site)
 
         if (
-            self.valves.CITATION_LINKS
+            result_site
+            and self.valves.CITATION_LINKS
             and "content" in result_site
             and __event_emitter__
         ):

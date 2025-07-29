@@ -16,17 +16,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Setup ruff
+      uses: astral-sh/ruff-action@v3
+      with:
+        args: "--version"
+
     - name: Run build
-      run: python ./script/build.py
-
-    - name: Install dependencies
-      run: pip install ruff
-
-    - name: Ruff Check
-      run: ruff check --fix ./dist
-
-    - name: Ruff Format
-      run: ruff format ./dist
+      run: make build-format
 
     - name: Get PR title
       id: get_pr_title
