@@ -16,8 +16,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: pip install ruff
+    - name: Setup ruff
+      uses: astral-sh/ruff-action@v3
+      with:
+        args: "--version"
 
     - name: Run build
       run: make build-format
