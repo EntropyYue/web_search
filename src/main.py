@@ -220,6 +220,6 @@ class Tools:
             )
         if self.valves.STATUS:
             await emitter.emit(
-                status="complete", description="已成功检索和处理网站内容", done=True
+                status="complete", description="已成功获取网站内容", done=True
             )
         return json.dumps(results_json, indent=4, ensure_ascii=False)
