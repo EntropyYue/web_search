@@ -125,14 +125,19 @@ class Tools:
                     result_json = await task
                     if not result_json:
                         continue
+
                     results_json.append(result_json)
                     processed_count += 1
                     await emitter.status(
                         f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
                     )
+
                     if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
                         for task in pending:
                             task.cancel()
+                        await asyncio.gather(*pending, return_exceptions=True)
+                        tasks = []
+                        break
 
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
@@ -184,21 +189,11 @@ class Tools:
             result_site = await functions.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
-        if (
-            result_site
-            and self.valves.CITATION_LINKS
-            and "content" in result_site
-            and __event_emitter__
-        ):
-            await __event_emitter__(
-                {
-                    "type": "citation",
-                    "data": {
-                        "document": [result_site["content"]],
-                        "metadata": [{"source": result_site["url"]}],
-                        "source": {"name": result_site["title"]},
-                    },
-                }
+        if result_site and "content" in result_site:
+            await emitter.citation(
+                document=[result_site["content"]],
+                metadata=[{"source": result_site["url"]}],
+                source={"name": result_site["title"]},
             )
         await emitter.status(
             status="complete", description="已成功获取网站内容", done=True
