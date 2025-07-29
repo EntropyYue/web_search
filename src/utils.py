@@ -6,11 +6,12 @@ from urllib.parse import ParseResult, urlparse
 
 from aiohttp import ClientSession
 from bs4 import BeautifulSoup
-
+from tiktoken import get_encoding
 
 class HelpFunctions:
     def __init__(self, value) -> None:
         self.valves = value
+        self.tokenizer = get_encoding("cl100k_base") 
 
     def get_base_url(self, url: str) -> str:
         parsed_url: ParseResult = urlparse(url)
@@ -90,9 +91,10 @@ class HelpFunctions:
         return None
 
     def truncate_to_n_words(self, text: str, token_limit: int) -> str:
-        tokens = text.split()
+        tokens = self.tokenizer.encode(text)
         truncated_tokens = tokens[:token_limit]
-        return " ".join(truncated_tokens)
+        deocoded_tokens = self.tokenizer.decode(truncated_tokens)
+        return deocoded_tokens
 
 
 class EventEmitter:
