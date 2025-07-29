@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from aiohttp import ClientSession, ClientError
+from aiohttp import ClientError, ClientSession
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, HelpFunctions
@@ -91,8 +91,8 @@ class Tools:
                 resp = await session.get(
                     search_engine_url, params=params, headers=self.headers
                 )
-            resp.raise_for_status()
-            data = await resp.json()
+                resp.raise_for_status()
+                data = await resp.json()
 
             results = data.get("results", [])
             if self.valves.STATUS:
