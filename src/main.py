@@ -39,10 +39,6 @@ class Tools:
             default=False,
             description="如果为True，则发送带有链接的自定义引用",
         )
-        JINA_READER_BASE_URL: str = Field(
-            default="",
-            description="Jina Reader的基础URL，使用默认参数以关闭",
-        )
         REMOVE_LINKS: bool = Field(
             default=True,
             description="检索中的返回是否移除链接",
@@ -70,7 +66,7 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        functions = HelpFunctions(self.valves)
+        functions = HelpFunctions(self.valves, self.headers)
         emitter = EventEmitter(__event_emitter__)
 
         if self.valves.STATUS:
@@ -190,7 +186,7 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        functions = HelpFunctions(self.valves)
+        functions = HelpFunctions(self.valves, self.headers)
         emitter = EventEmitter(__event_emitter__)
         if self.valves.STATUS:
             await emitter.emit(f"正在从URL获取内容: {url}")

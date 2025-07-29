@@ -8,18 +8,17 @@ from aiohttp import ClientSession
 from bs4 import BeautifulSoup
 from tiktoken import get_encoding
 
+
 class HelpFunctions:
-    def __init__(self, value) -> None:
+    def __init__(self, value, header) -> None:
         self.valves = value
-        self.tokenizer = get_encoding("cl100k_base") 
+        self.header = header
+        self.tokenizer = get_encoding("cl100k_base")
 
     def get_base_url(self, url: str) -> str:
         parsed_url: ParseResult = urlparse(url)
         base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
         return base_url
-
-    def generate_excerpt(self, content: str, max_length=200) -> str:
-        return content[:max_length] + "..." if len(content) > max_length else content
 
     def format_text(self, original_text: str) -> str:
         soup = BeautifulSoup(original_text, "html.parser")
@@ -43,7 +42,7 @@ class HelpFunctions:
         self, url: str, session: ClientSession
     ) -> dict[str, str]:
         try:
-            response_site = await session.get(self.valves.JINA_READER_BASE_URL + url)
+            response_site = await session.get(url, headers=self.header)
             response_site.raise_for_status()
             html_content = await response_site.text()
             soup = BeautifulSoup(html_content, "html.parser")
@@ -76,6 +75,7 @@ class HelpFunctions:
         self.remove_emojis(result["title"])
         url_site = result["url"]
         snippet = result.get("content", "")
+
         if self.valves.IGNORED_WEBSITES:
             base_url = self.get_base_url(url_site)
             if any(
@@ -90,11 +90,17 @@ class HelpFunctions:
             return result_data
         return None
 
+    def clean_invisible_chars(self, text: str) -> str:
+        invisible = ["\ufeff", "\u200b", "\u2028", "\u2060"]
+        for ch in invisible:
+            text = text.replace(ch, "")
+        return text.lstrip()
+
     def truncate_to_n_words(self, text: str, token_limit: int) -> str:
         tokens = self.tokenizer.encode(text)
         truncated_tokens = tokens[:token_limit]
         deocoded_tokens = self.tokenizer.decode(truncated_tokens)
-        return deocoded_tokens
+        return self.clean_invisible_chars(deocoded_tokens)
 
 
 class EventEmitter:
