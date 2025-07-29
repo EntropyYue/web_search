@@ -21,11 +21,8 @@ jobs:
       with:
         args: "--version"
 
-    - name: Ruff Check
-      run: ruff check --fix
-
-    - name: Ruff Format
-      run: ruff format
+    - name: Lint and format
+      run: make lint-format
 
     - name: Check for changes
       run: git diff --exit-code
@@ -38,4 +35,4 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Run build
-      run: python ./script/build.py
+      run: make build-format

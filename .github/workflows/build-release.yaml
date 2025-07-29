@@ -16,17 +16,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Run build
-      run: python ./script/build.py
-
     - name: Install dependencies
       run: pip install ruff
 
-    - name: Ruff Check
-      run: ruff check --fix ./dist
-
-    - name: Ruff Format
-      run: ruff format ./dist
+    - name: Run build
+      run: make build-format
 
     - name: Get PR title
       id: get_pr_title
