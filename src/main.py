@@ -41,15 +41,15 @@ class Tools:
         )
         REMOVE_LINKS: bool = Field(
             default=True,
-            description="检索中的返回是否移除链接",
+            description="移除检索返回中的链接",
         )
         CITATION_LINKS: bool = Field(
             default=False,
-            description="如果为True，则发送带有链接的自定义引用",
+            description="发送带有链接的自定义引用",
         )
         STATUS: bool = Field(
             default=True,
-            description="如果为True，则发送状态",
+            description="发送状态",
         )
 
     def __init__(self):
