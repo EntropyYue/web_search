@@ -35,13 +35,17 @@ class Tools:
             default=5000,
             description="限制每页的字数",
         )
-        CITATION_LINKS: bool = Field(
+        USE_ENV_PROXY: bool = Field(
             default=False,
-            description="如果为True，则发送带有链接的自定义引用",
+            description="使用环境变量中的代理",
         )
         REMOVE_LINKS: bool = Field(
             default=True,
             description="检索中的返回是否移除链接",
+        )
+        CITATION_LINKS: bool = Field(
+            default=False,
+            description="如果为True，则发送带有链接的自定义引用",
         )
         STATUS: bool = Field(
             default=True,
@@ -81,7 +85,7 @@ class Tools:
 
         try:
             await emitter.status("正在向搜索引擎发送请求")
-            async with ClientSession() as session:
+            async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
                 resp = await session.get(
                     search_engine_url, params=params, headers=self.headers
                 )
@@ -107,7 +111,7 @@ class Tools:
 
         await emitter.status("正在处理搜索结果")
 
-        async with ClientSession() as session:
+        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
             tasks = [
                 asyncio.create_task(functions.process_search_result(result, session))
                 for result in results
@@ -185,7 +189,7 @@ class Tools:
 
         if url.strip() == "":
             return ""
-        async with ClientSession() as session:
+        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
             result_site = await functions.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
