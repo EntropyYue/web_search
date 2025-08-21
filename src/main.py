@@ -14,7 +14,7 @@ from typing import Any
 from aiohttp import ClientError, ClientSession
 from pydantic import BaseModel, Field
 
-from utils import EventEmitter, HelpFunctions
+from utils import EventEmitter, WebLoader
 
 
 class Tools:
@@ -70,7 +70,7 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        functions = HelpFunctions(self.valves, self.headers)
+        loader = WebLoader(self.valves, self.headers)
         emitter = EventEmitter(self.valves, __event_emitter__)
 
         await emitter.status(f"正在搜索: {query}")
@@ -113,7 +113,7 @@ class Tools:
 
         async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
             tasks = [
-                asyncio.create_task(functions.process_search_result(result, session))
+                asyncio.create_task(loader.process_search_result(result, session))
                 for result in results
             ]
 
@@ -181,7 +181,7 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        functions = HelpFunctions(self.valves, self.headers)
+        loader = WebLoader(self.valves, self.headers)
         emitter = EventEmitter(self.valves, __event_emitter__)
         await emitter.status(f"正在从URL获取内容: {url}")
 
@@ -190,7 +190,7 @@ class Tools:
         if url.strip() == "":
             return ""
         async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
-            result_site = await functions.fetch_and_process_page(url, session)
+            result_site = await loader.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
         if result_site and "content" in result_site:

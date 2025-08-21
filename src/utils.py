@@ -51,7 +51,7 @@ class PageCleaner:
         return text
 
 
-class HelpFunctions:
+class WebLoader:
     def __init__(self, valves, headers) -> None:
         self.valves = valves
         self.headers = headers
