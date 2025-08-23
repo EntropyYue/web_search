@@ -112,11 +112,11 @@ class EventEmitter:
         self.valves = valves
         self.event_emitter = event_emitter
 
-    async def emit(self, payload: dict[str, Any]) -> None:
+    async def _emit(self, type, data: dict[str, Any]) -> None:
         if not self.event_emitter:
             return
 
-        await self.event_emitter(payload)
+        await self.event_emitter({"type": type, "data": data})
 
     async def status(
         self,
@@ -126,20 +126,18 @@ class EventEmitter:
         action: str | None = "",
         urls: list[str] | None = None,
     ) -> None:
-        if self.valves.STATUS is False:
+        if not self.valves.STATUS:
             return
-
-        payload = {
-            "type": "status",
-            "data": {
+        await self._emit(
+            type="status",
+            data={
                 "description": description,
                 "status": status,
                 "done": done,
                 "action": action,
                 "urls": urls,
             },
-        }
-        await self.emit(payload)
+        )
 
     async def citation(
         self,
@@ -147,11 +145,9 @@ class EventEmitter:
         metadata: list[dict[str, str]],
         source: dict[str, str],
     ) -> None:
-        if self.valves.CITATION_LINKS is False:
+        if not self.valves.CITATION_LINKS:
             return
-
-        payload = {
-            "type": "citation",
-            "data": {"document": document, "metadata": metadata, "source": source},
-        }
-        await self.emit(payload)
+        await self._emit(
+            type="citation",
+            data={"document": document, "metadata": metadata, "source": source},
+        )
