@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 7.5
+version: 7.6
 license: MIT
 """
 
@@ -14,7 +14,7 @@ from typing import Any
 from aiohttp import ClientError, ClientSession
 from pydantic import BaseModel, Field
 
-from utils import EventEmitter, HelpFunctions
+from utils import EventEmitter, WebLoader
 
 
 class Tools:
@@ -35,17 +35,21 @@ class Tools:
             default=5000,
             description="限制每页的字数",
         )
-        CITATION_LINKS: bool = Field(
+        USE_ENV_PROXY: bool = Field(
             default=False,
-            description="如果为True，则发送带有链接的自定义引用",
+            description="使用环境变量中的代理",
         )
         REMOVE_LINKS: bool = Field(
             default=True,
-            description="检索中的返回是否移除链接",
+            description="移除检索返回中的链接",
+        )
+        CITATION_LINKS: bool = Field(
+            default=False,
+            description="发送带有链接的自定义引用",
         )
         STATUS: bool = Field(
             default=True,
-            description="如果为True，则发送状态",
+            description="发送状态",
         )
 
     def __init__(self):
@@ -66,7 +70,7 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        functions = HelpFunctions(self.valves, self.headers)
+        loader = WebLoader(self.valves, self.headers)
         emitter = EventEmitter(self.valves, __event_emitter__)
 
         await emitter.status(f"正在搜索: {query}")
@@ -81,7 +85,7 @@ class Tools:
 
         try:
             await emitter.status("正在向搜索引擎发送请求")
-            async with ClientSession() as session:
+            async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
                 resp = await session.get(
                     search_engine_url, params=params, headers=self.headers
                 )
@@ -107,9 +111,9 @@ class Tools:
 
         await emitter.status("正在处理搜索结果")
 
-        async with ClientSession() as session:
+        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
             tasks = [
-                asyncio.create_task(functions.process_search_result(result, session))
+                asyncio.create_task(loader.process_search_result(result, session))
                 for result in results
             ]
 
@@ -177,7 +181,7 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        functions = HelpFunctions(self.valves, self.headers)
+        loader = WebLoader(self.valves, self.headers)
         emitter = EventEmitter(self.valves, __event_emitter__)
         await emitter.status(f"正在从URL获取内容: {url}")
 
@@ -185,8 +189,8 @@ class Tools:
 
         if url.strip() == "":
             return ""
-        async with ClientSession() as session:
-            result_site = await functions.fetch_and_process_page(url, session)
+        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
+            result_site = await loader.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
         if result_site and "content" in result_site:

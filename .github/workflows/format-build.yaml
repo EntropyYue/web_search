@@ -21,8 +21,14 @@ jobs:
       with:
         args: "--version"
 
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v6
+
     - name: Lint and format
       run: make lint-format
+
+    - name: uv Sync
+      run: uv sync
 
     - name: Check for changes
       run: git diff --exit-code
