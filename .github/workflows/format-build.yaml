@@ -21,6 +21,9 @@ jobs:
       with:
         args: "--version"
 
+    - name: Setup uv
+      uses: astral-sh/setup-uv@v6
+
     - name: Lint and format
       run: make lint-format
 
