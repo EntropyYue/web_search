@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, WebLoader
@@ -39,6 +39,10 @@ class Tools:
             default=False,
             description="使用环境变量中的代理",
         )
+        WEB_LOAD_TIMEOUT: int = Field(
+            default=5,
+            description="网页抓取超时时间 (秒)",
+        )
         REMOVE_LINKS: bool = Field(
             default=True,
             description="移除检索返回中的链接",
@@ -54,6 +58,7 @@ class Tools:
 
     def __init__(self):
         self.valves = self.Valves()
+        self.timeout = ClientTimeout(total=self.valves.WEB_LOAD_TIMEOUT)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         }
@@ -111,7 +116,9 @@ class Tools:
 
         await emitter.status("正在处理搜索结果")
 
-        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
+        async with ClientSession(
+            trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
+        ) as session:
             tasks = [
                 asyncio.create_task(loader.process_search_result(result, session))
                 for result in results
@@ -189,7 +196,9 @@ class Tools:
 
         if url.strip() == "":
             return ""
-        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
+        async with ClientSession(
+            trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
+        ) as session:
             result_site = await loader.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
