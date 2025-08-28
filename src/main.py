@@ -125,30 +125,26 @@ class Tools:
             ]
 
             processed_count = 0
-            while tasks and processed_count < len(results):
+            for done in asyncio.as_completed(tasks):
                 try:
-                    done, pending = await asyncio.wait(
-                        tasks, return_when=asyncio.FIRST_COMPLETED
-                    )
+                    result_json = await done
                 except BaseException:
                     continue
-                for task in done:
-                    result_json = await task
-                    if not result_json:
-                        continue
+                if not result_json:
+                    continue
 
-                    results_json.append(result_json)
-                    processed_count += 1
-                    await emitter.status(
-                        f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
-                    )
+                results_json.append(result_json)
+                processed_count += 1
+                await emitter.status(
+                    f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
+                )
 
-                    if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                        for task in pending:
+                if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                    for task in tasks:
+                        if not task.done():
                             task.cancel()
-                        await asyncio.gather(*pending, return_exceptions=True)
-                        tasks = []
-                        break
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                    break
 
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
