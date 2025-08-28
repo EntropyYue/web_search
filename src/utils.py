@@ -26,7 +26,7 @@ class PageCleaner:
         return soup.get_text(separator="\n", strip=True)
 
     def clean_text(self, text: str) -> str:
-        text = unicodedata.normalize("NFKC", text)
+        text = self._normalize_text(text)
         text = re.sub(r"[ \t]+", " ", text)
         if self.remove_links:
             text = re.sub(r"\(https?://[^\s]+\)", "(links)", text)

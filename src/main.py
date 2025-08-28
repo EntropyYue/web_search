@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 7.6
+version: 8.0
 license: MIT
 """
 
@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, WebLoader
@@ -39,6 +39,10 @@ class Tools:
             default=False,
             description="使用环境变量中的代理",
         )
+        WEB_LOAD_TIMEOUT: int = Field(
+            default=5,
+            description="网页抓取超时时间 (秒)",
+        )
         REMOVE_LINKS: bool = Field(
             default=True,
             description="移除检索返回中的链接",
@@ -54,6 +58,7 @@ class Tools:
 
     def __init__(self):
         self.valves = self.Valves()
+        self.timeout = ClientTimeout(total=self.valves.WEB_LOAD_TIMEOUT)
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
         }
@@ -111,37 +116,35 @@ class Tools:
 
         await emitter.status("正在处理搜索结果")
 
-        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
+        async with ClientSession(
+            trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
+        ) as session:
             tasks = [
                 asyncio.create_task(loader.process_search_result(result, session))
                 for result in results
             ]
 
             processed_count = 0
-            while tasks and processed_count < len(results):
+            for done in asyncio.as_completed(tasks):
                 try:
-                    done, pending = await asyncio.wait(
-                        tasks, return_when=asyncio.FIRST_COMPLETED
-                    )
+                    result_json = await done
                 except BaseException:
                     continue
-                for task in done:
-                    result_json = await task
-                    if not result_json:
-                        continue
+                if not result_json:
+                    continue
 
-                    results_json.append(result_json)
-                    processed_count += 1
-                    await emitter.status(
-                        f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
-                    )
+                results_json.append(result_json)
+                processed_count += 1
+                await emitter.status(
+                    f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
+                )
 
-                    if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
-                        for task in pending:
+                if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                    for task in tasks:
+                        if not task.done():
                             task.cancel()
-                        await asyncio.gather(*pending, return_exceptions=True)
-                        tasks = []
-                        break
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                    break
 
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
@@ -189,7 +192,9 @@ class Tools:
 
         if url.strip() == "":
             return ""
-        async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
+        async with ClientSession(
+            trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
+        ) as session:
             result_site = await loader.fetch_and_process_page(url, session)
         results_json.append(result_site)
 
