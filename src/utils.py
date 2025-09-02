@@ -52,12 +52,12 @@ class PageCleaner:
 
 
 class WebLoader:
-    def __init__(self, valves, headers) -> None:
+    def __init__(self, valves, headers: dict, token_limit: int) -> None:
         self.valves = valves
         self.headers = headers
         self.cleaner = PageCleaner(
             remove_links=valves.REMOVE_LINKS,
-            token_limit=valves.PAGE_CONTENT_WORDS_LIMIT,
+            token_limit=token_limit,
         )
 
     def get_base_url(self, url: str) -> str:
