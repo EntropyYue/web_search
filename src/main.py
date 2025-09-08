@@ -89,12 +89,7 @@ class Tools:
         await emitter.status(f"正在搜索: {query}")
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
-
-        params = {
-            "q": query,
-            "format": "json",
-            "number_of_results": self.valves.MAX_SEARCH_RESULTS,
-        }
+        params = {"q": query, "format": "json"}
 
         try:
             await emitter.status("正在向搜索引擎发送请求")
