@@ -98,10 +98,12 @@ class Tools:
 
         try:
             await emitter.status("正在向搜索引擎发送请求")
-            async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
-                resp = await session.get(
+            async with (
+                ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session,
+                session.get(
                     search_engine_url, params=params, headers=self.headers
-                )
+                ) as resp,
+            ):
                 resp.raise_for_status()
                 data = await resp.json()
 
