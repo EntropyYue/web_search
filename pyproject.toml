@@ -1,6 +1,6 @@
 [project]
 name = "web-search"
-version = "8.1"
+version = "8.2"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"

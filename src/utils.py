@@ -10,8 +10,7 @@ from tiktoken import get_encoding
 
 
 class PageCleaner:
-    def __init__(self, remove_links: bool = True, token_limit: int = 1000):
-        self.remove_links = remove_links
+    def __init__(self, token_limit: int = 1000):
         self.token_limit = token_limit
         self.tokenizer = get_encoding("cl100k_base")
         self.invisible_chars = ["\ufeff", "\u200b", "\u2028", "\u2060"]
@@ -28,8 +27,6 @@ class PageCleaner:
     def clean_text(self, text: str) -> str:
         text = self._normalize_text(text)
         text = re.sub(r"[ \t]+", " ", text)
-        if self.remove_links:
-            text = re.sub(r"\(https?://[^\s]+\)", "(links)", text)
         text = self._remove_emojis(text)
         text = self._remove_invisible_chars(text)
         return text.strip()
@@ -55,10 +52,7 @@ class WebLoader:
     def __init__(self, valves, headers: dict, token_limit: int) -> None:
         self.valves = valves
         self.headers = headers
-        self.cleaner = PageCleaner(
-            remove_links=valves.REMOVE_LINKS,
-            token_limit=token_limit,
-        )
+        self.cleaner = PageCleaner(token_limit=token_limit)
 
     def get_base_url(self, url: str) -> str:
         parsed_url: ParseResult = urlparse(url)

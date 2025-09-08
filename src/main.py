@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 8.1
+version: 8.2
 license: MIT
 """
 
@@ -47,10 +47,6 @@ class Tools:
             default=5,
             description="网页抓取超时时间 (秒)",
         )
-        REMOVE_LINKS: bool = Field(
-            default=True,
-            description="移除检索返回中的链接",
-        )
         CITATION_LINKS: bool = Field(
             default=False,
             description="发送带有链接的自定义引用",
@@ -89,12 +85,7 @@ class Tools:
         await emitter.status(f"正在搜索: {query}")
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
-
-        params = {
-            "q": query,
-            "format": "json",
-            "number_of_results": self.valves.MAX_SEARCH_RESULTS,
-        }
+        params = {"q": query, "format": "json"}
 
         try:
             await emitter.status("正在向搜索引擎发送请求")
