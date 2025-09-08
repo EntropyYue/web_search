@@ -123,7 +123,7 @@ class EventEmitter:
         description: str = "未知状态",
         status: str = "in_progress",
         done: bool = False,
-        action: str | None = "",
+        action: str | None = None,
         urls: list[str] | None = None,
     ) -> None:
         if not self.valves.STATUS:
