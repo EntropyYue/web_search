@@ -47,10 +47,6 @@ class Tools:
             default=5,
             description="网页抓取超时时间 (秒)",
         )
-        REMOVE_LINKS: bool = Field(
-            default=True,
-            description="移除检索返回中的链接",
-        )
         CITATION_LINKS: bool = Field(
             default=False,
             description="发送带有链接的自定义引用",
