@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 8.0
+version: 8.1
 license: MIT
 """
 
@@ -31,9 +31,13 @@ class Tools:
             default=3,
             description="要分析的搜索引擎结果数",
         )
-        PAGE_CONTENT_WORDS_LIMIT: int = Field(
+        SEARCH_PAGE_TOKENS_LIMIT: int = Field(
+            default=2000,
+            description="搜索结果每页的限制Token数",
+        )
+        GET_WEBSITE_TOKENS_LIMIT: int = Field(
             default=5000,
-            description="限制每页的字数",
+            description="获取网站的限制Token数",
         )
         USE_ENV_PROXY: bool = Field(
             default=False,
@@ -75,7 +79,11 @@ class Tools:
 
         :return: The content of the pages in json format.
         """
-        loader = WebLoader(self.valves, self.headers)
+        loader = WebLoader(
+            valves=self.valves,
+            headers=self.headers,
+            token_limit=self.valves.SEARCH_PAGE_TOKENS_LIMIT,
+        )
         emitter = EventEmitter(self.valves, __event_emitter__)
 
         await emitter.status(f"正在搜索: {query}")
@@ -90,10 +98,12 @@ class Tools:
 
         try:
             await emitter.status("正在向搜索引擎发送请求")
-            async with ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session:
-                resp = await session.get(
+            async with (
+                ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session,
+                session.get(
                     search_engine_url, params=params, headers=self.headers
-                )
+                ) as resp,
+            ):
                 resp.raise_for_status()
                 data = await resp.json()
 
@@ -184,7 +194,11 @@ class Tools:
 
         :return: The content of the website in json format.
         """
-        loader = WebLoader(self.valves, self.headers)
+        loader = WebLoader(
+            valves=self.valves,
+            headers=self.headers,
+            token_limit=self.valves.GET_WEBSITE_TOKENS_LIMIT,
+        )
         emitter = EventEmitter(self.valves, __event_emitter__)
         await emitter.status(f"正在从URL获取内容: {url}")
 
