@@ -117,7 +117,9 @@ class EventEmitter:
         description: str = "未知状态",
         status: str = "in_progress",
         done: bool = False,
-        action: str | None = None,
+        action: str | None = "web_search",
+        queries: list[str] | None = None,
+        count: int | None = None,
         urls: list[str] | None = None,
     ) -> None:
         if not self.valves.STATUS:
@@ -129,8 +131,30 @@ class EventEmitter:
                 "status": status,
                 "done": done,
                 "action": action,
+                "queries": queries,
+                "count": count,
                 "urls": urls,
             },
+        )
+
+    async def queries(self, queries: list[str]) -> None:
+        await self.status(
+            action="web_search_queries_generated",
+            queries=queries,
+        )
+
+    async def count(self, count: int, urls: list[str]) -> None:
+        await self.status(
+            action="web_search",
+            description=f"Searched {count} sites",
+            urls=urls,
+        )
+
+    async def fetched(self, count: int) -> None:
+        await self.status(
+            action="sources_retrieved",
+            count=count,
+            done=True,
         )
 
     async def citation(
