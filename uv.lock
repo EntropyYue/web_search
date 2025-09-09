@@ -639,7 +639,7 @@ wheels = [
 
 [[package]]
 name = "web-search"
-version = "9.0"
+version = "9.1"
 source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },

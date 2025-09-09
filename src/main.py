@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 9.0
+version: 9.1
 license: MIT
 """
 
@@ -91,7 +91,7 @@ class Tools:
             return json.dumps({"error": str(e)})
 
         results = data.get("results", [])
-        await emitter.count(len(results), [result.get("url", "") for result in results])
+        await emitter.urls([result.get("url", "") for result in results])
 
         results_json: list[dict[str, str]] = []
         if not results:
@@ -191,8 +191,6 @@ class Tools:
                         metadata=[{"source": result_site["url"]}],
                         source={"name": result_site["title"]},
                     )
-        await emitter.count(
-            len(results_json), [result.get("url", "") for result in results_json]
-        )
+        await emitter.urls([result.get("url", "") for result in results_json])
         await emitter.fetched(len(results_json))
         return json.dumps(results_json, indent=4, ensure_ascii=False)
