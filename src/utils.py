@@ -143,10 +143,10 @@ class EventEmitter:
             queries=queries,
         )
 
-    async def count(self, count: int, urls: list[str]) -> None:
+    async def urls(self, urls: list[str]) -> None:
         await self.status(
             action="web_search",
-            description=f"Searched {count} sites",
+            description="Searched {{count}} sites",
             urls=urls,
         )
 
