@@ -65,6 +65,8 @@ class Tools:
         )
         emitter = EventEmitter(self.valves, __event_emitter__)
 
+        await emitter.status("Searching the web")
+
         await emitter.queries([query])
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
