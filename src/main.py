@@ -20,41 +20,24 @@ from utils import EventEmitter, WebLoader
 class Tools:
     class Valves(BaseModel):
         SEARXNG_ENGINE_API_BASE_URL: str = Field(
-            default="https://example.com/search",
-            description="搜索引擎的基础URL",
+            default="https://example.com/search", description="搜索引擎的基础URL"
         )
         IGNORED_WEBSITES: str = Field(
-            default="",
-            description="以逗号分隔的要忽略的网站列表",
+            default="", description="以逗号分隔的要忽略的网站列表"
         )
-        MAX_SEARCH_RESULTS: int = Field(
-            default=3,
-            description="要分析的搜索引擎结果数",
-        )
+        MAX_SEARCH_RESULTS: int = Field(default=3, description="要分析的搜索引擎结果数")
         SEARCH_PAGE_TOKENS_LIMIT: int = Field(
-            default=2000,
-            description="搜索结果每页的限制Token数",
+            default=2000, description="搜索结果每页的限制Token数"
         )
         GET_WEBSITE_TOKENS_LIMIT: int = Field(
-            default=5000,
-            description="获取网站的限制Token数",
+            default=5000, description="获取网站的限制Token数"
         )
-        USE_ENV_PROXY: bool = Field(
-            default=False,
-            description="使用环境变量中的代理",
-        )
-        WEB_LOAD_TIMEOUT: int = Field(
-            default=5,
-            description="网页抓取超时时间 (秒)",
-        )
+        USE_ENV_PROXY: bool = Field(default=False, description="使用环境变量中的代理")
+        WEB_LOAD_TIMEOUT: int = Field(default=5, description="网页抓取超时时间 (秒)")
         CITATION_LINKS: bool = Field(
-            default=False,
-            description="发送带有链接的自定义引用",
+            default=False, description="发送带有链接的自定义引用"
         )
-        STATUS: bool = Field(
-            default=True,
-            description="发送状态",
-        )
+        STATUS: bool = Field(default=True, description="发送状态")
 
     def __init__(self):
         self.valves = self.Valves()
@@ -82,13 +65,12 @@ class Tools:
         )
         emitter = EventEmitter(self.valves, __event_emitter__)
 
-        await emitter.status(f"正在搜索: {query}")
+        await emitter.queries([query])
 
         search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
         params = {"q": query, "format": "json"}
 
         try:
-            await emitter.status("正在向搜索引擎发送请求")
             async with (
                 ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session,
                 session.get(
@@ -107,15 +89,13 @@ class Tools:
             return json.dumps({"error": str(e)})
 
         results = data.get("results", [])
-        await emitter.status(f"返回了 {len(results)} 个搜索结果")
+        await emitter.count(len(results), [result.get("url", "") for result in results])
 
         results_json: list[dict[str, str]] = []
         if not results:
             return json.dumps(
                 {"error": "No search results found"}, indent=4, ensure_ascii=False
             )
-
-        await emitter.status("正在处理搜索结果")
 
         async with ClientSession(
             trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
@@ -125,7 +105,6 @@ class Tools:
                 for result in results
             ]
 
-            processed_count = 0
             for done in asyncio.as_completed(tasks):
                 try:
                     result_json = await done
@@ -135,10 +114,6 @@ class Tools:
                     continue
 
                 results_json.append(result_json)
-                processed_count += 1
-                await emitter.status(
-                    f"处理页面 {processed_count}/{self.valves.MAX_SEARCH_RESULTS} , 共 {len(results)} 个页面",
-                )
 
                 if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
                     for task in tasks:
@@ -150,6 +125,7 @@ class Tools:
             results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
             if not len(results_json):
+                await emitter.fetched(0)
                 return json.dumps(
                     {"error": "No fetched results found"}, indent=4, ensure_ascii=False
                 )
@@ -165,18 +141,12 @@ class Tools:
         for result in results_json:
             urls.append(result["url"])
 
-        await emitter.status(
-            status="complete",
-            description=f"搜索到 {len(results_json)} 个结果",
-            done=True,
-            action="web_search",
-            urls=urls,
-        )
+        await emitter.fetched(len(results_json))
 
         return json.dumps(results_json, indent=4, ensure_ascii=False)
 
     async def get_website(
-        self, url: str, __event_emitter__: Callable[[dict], Any] | None = None
+        self, urls: list[str], __event_emitter__: Callable[[dict], Any] | None = None
     ) -> str:
         """
         打开输入的网站并获取其内容
@@ -191,25 +161,36 @@ class Tools:
             token_limit=self.valves.GET_WEBSITE_TOKENS_LIMIT,
         )
         emitter = EventEmitter(self.valves, __event_emitter__)
-        await emitter.status(f"正在从URL获取内容: {url}")
+        await emitter.queries(urls)
 
         results_json = []
 
-        if url.strip() == "":
+        if urls == []:
             return ""
         async with ClientSession(
             trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
         ) as session:
-            result_site = await loader.fetch_and_process_page(url, session)
-        results_json.append(result_site)
+            tasks = [
+                asyncio.create_task(loader.fetch_and_process_page(url, session))
+                for url in urls
+            ]
+            for task in tasks:
+                try:
+                    result_site = await task
+                except BaseException:
+                    continue
+                if not result_site:
+                    continue
+                results_json.append(result_site)
 
-        if result_site and "content" in result_site:
-            await emitter.citation(
-                document=[result_site["content"]],
-                metadata=[{"source": result_site["url"]}],
-                source={"name": result_site["title"]},
-            )
-        await emitter.status(
-            status="complete", description="已成功获取网站内容", done=True
+                if "content" in result_site:
+                    await emitter.citation(
+                        document=[result_site["content"]],
+                        metadata=[{"source": result_site["url"]}],
+                        source={"name": result_site["title"]},
+                    )
+        await emitter.count(
+            len(results_json), [result.get("url", "") for result in results_json]
         )
+        await emitter.fetched(len(results_json))
         return json.dumps(results_json, indent=4, ensure_ascii=False)
