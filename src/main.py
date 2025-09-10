@@ -153,7 +153,7 @@ class Tools:
         """
         打开输入的网站并获取其内容
 
-        :params url: 需要打开的网站
+        :params urls: 需要打开的网站
 
         :return: The content of the website in json format.
         """
