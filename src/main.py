@@ -57,7 +57,7 @@ class Tools:
         """
         搜索网络并获取相关页面的内容，搜索未知知识、新闻、信息、公共联系信息、天气等
 
-        :params queries: 搜索中使用的多个角度的关键词
+        :params queries: 搜索中使用的关键词列表
 
         :return: The content of the pages in json format.
         """
@@ -158,7 +158,7 @@ class Tools:
         """
         打开输入的网站并获取其内容
 
-        :params urls: 需要打开的网站
+        :params urls: 需要打开的网站列表
 
         :return: The content of the website in json format.
         """
