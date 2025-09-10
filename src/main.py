@@ -14,7 +14,7 @@ from typing import Any
 from aiohttp import ClientError, ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
-from utils import EventEmitter, WebLoader
+from utils import EventEmitter, SearchEngine, WebLoader
 
 
 class Tools:
@@ -25,7 +25,10 @@ class Tools:
         IGNORED_WEBSITES: str = Field(
             default="", description="以逗号分隔的要忽略的网站列表"
         )
-        MAX_SEARCH_RESULTS: int = Field(default=3, description="要分析的搜索引擎结果数")
+        MAX_SEARCH_RESULTS: int = Field(
+            default=3, description="单个关键词要返回的结果数"
+        )
+        MAX_PROCESSED_RESULTS: int = Field(default=10, description="要处理的最大结果数")
         SEARCH_PAGE_TOKENS_LIMIT: int = Field(
             default=2000, description="搜索结果每页的限制Token数"
         )
@@ -48,13 +51,13 @@ class Tools:
 
     async def search_web(
         self,
-        query: str,
+        queries: list[str],
         __event_emitter__: Callable[[dict], Any] | None = None,
     ) -> str:
         """
         搜索网络并获取相关页面的内容，搜索未知知识、新闻、信息、公共联系信息、天气等
 
-        :params query: 搜索中使用的关键词
+        :params queries: 搜索中使用的多个角度的关键词
 
         :return: The content of the pages in json format.
         """
@@ -64,33 +67,37 @@ class Tools:
             token_limit=self.valves.SEARCH_PAGE_TOKENS_LIMIT,
         )
         emitter = EventEmitter(self.valves, __event_emitter__)
+        search_engine = SearchEngine(
+            url=self.valves.SEARXNG_ENGINE_API_BASE_URL,
+            max_result=self.valves.MAX_SEARCH_RESULTS,
+            headers=self.headers,
+        )
 
         await emitter.status("Searching the web")
 
-        await emitter.queries([query])
+        await emitter.queries(queries)
+        async with ClientSession(
+            trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
+        ) as session:
+            tasks = [
+                asyncio.create_task(search_engine.search(query, session))
+                for query in queries
+            ]
+            results: list[dict[str, str]] = []
+            for done in asyncio.as_completed(tasks):
+                try:
+                    search_result = await done
+                except ClientError as e:
+                    await emitter.status(
+                        status="error",
+                        description=f"搜索时出错: {str(e)}",
+                        done=True,
+                    )
+                    search_result = {}
 
-        search_engine_url = self.valves.SEARXNG_ENGINE_API_BASE_URL
-        params = {"q": query, "format": "json"}
+                if "results" in search_result:
+                    results.extend(search_result["results"])
 
-        try:
-            async with (
-                ClientSession(trust_env=self.valves.USE_ENV_PROXY) as session,
-                session.get(
-                    search_engine_url, params=params, headers=self.headers
-                ) as resp,
-            ):
-                resp.raise_for_status()
-                data = await resp.json()
-
-        except ClientError as e:
-            await emitter.status(
-                status="error",
-                description=f"搜索时出错: {str(e)}",
-                done=True,
-            )
-            return json.dumps({"error": str(e)})
-
-        results = data.get("results", [])
         await emitter.urls([result.get("url", "") for result in results])
 
         results_json: list[dict[str, str]] = []
@@ -117,14 +124,12 @@ class Tools:
 
                 results_json.append(result_json)
 
-                if len(results_json) >= self.valves.MAX_SEARCH_RESULTS:
+                if len(results_json) >= self.valves.MAX_PROCESSED_RESULTS:
                     for task in tasks:
                         if not task.done():
                             task.cancel()
                     await asyncio.gather(*tasks, return_exceptions=True)
                     break
-
-            results_json = results_json[: self.valves.MAX_SEARCH_RESULTS]
 
             if not len(results_json):
                 await emitter.fetched(0)
