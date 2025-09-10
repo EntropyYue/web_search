@@ -195,5 +195,7 @@ class Tools:
                         source={"name": result_site["title"]},
                     )
         await emitter.urls([result.get("url", "") for result in results_json])
+
         await emitter.fetched(len(results_json))
+
         return json.dumps(results_json, indent=4, ensure_ascii=False)
