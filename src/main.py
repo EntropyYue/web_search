@@ -163,6 +163,9 @@ class Tools:
             token_limit=self.valves.GET_WEBSITE_TOKENS_LIMIT,
         )
         emitter = EventEmitter(self.valves, __event_emitter__)
+
+        await emitter.status("Searching the web")
+
         await emitter.queries(urls)
 
         results_json = []
