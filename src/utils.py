@@ -101,6 +101,27 @@ class WebLoader:
         return None
 
 
+class SearchEngine:
+    def __init__(self, url: str, max_result: int, headers: dict) -> None:
+        self.url = url
+        self.max_result = max_result
+        self.headers = headers
+
+    async def search(self, query: str, session: ClientSession) -> dict[str, Any]:
+        params = {"q": query, "format": "json"}
+        try:
+            async with session.get(
+                self.url, params=params, headers=self.headers
+            ) as resp:
+                resp.raise_for_status()
+                result = await resp.json()
+            if "results" in result:
+                result["results"] = result["results"][: self.max_result]
+            return result
+        except ClientError as e:
+            raise RuntimeError(f"搜索时出错: {str(e)}") from e
+
+
 class EventEmitter:
     def __init__(self, valves, event_emitter: Callable[[dict], Any] | None = None):
         self.valves = valves
