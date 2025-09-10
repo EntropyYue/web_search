@@ -102,6 +102,9 @@ class Tools:
 
         results_json: list[dict[str, str]] = []
         if not results:
+            await emitter.status(
+                status="error", description="未找到搜索结果", done=True
+            )
             return json.dumps(
                 {"error": "No search results found"}, indent=4, ensure_ascii=False
             )
