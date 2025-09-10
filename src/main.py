@@ -179,7 +179,7 @@ class Tools:
                 asyncio.create_task(loader.fetch_and_process_page(url, session))
                 for url in urls
             ]
-            for task in tasks:
+            for task in asyncio.as_completed(tasks):
                 try:
                     result_site = await task
                 except BaseException:
