@@ -2,7 +2,7 @@
 title: Web Search
 author: EntropyYue
 funding_url: https://github.com/EntropyYue/web_search
-version: 9.2
+version: 9.3
 license: MIT
 """
 
@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from aiohttp import ClientError, ClientSession, ClientTimeout
+from aiohttp import ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, SearchEngine, WebLoader
@@ -87,7 +87,7 @@ class Tools:
             for done in asyncio.as_completed(tasks):
                 try:
                     search_result = await done
-                except ClientError as e:
+                except Exception as e:
                     await emitter.status(
                         status="error",
                         description=f"搜索时出错: {str(e)}",
@@ -120,12 +120,11 @@ class Tools:
             for done in asyncio.as_completed(tasks):
                 try:
                     result_json = await done
-                except BaseException:
-                    continue
-                if not result_json:
+                except Exception:
                     continue
 
-                results_json.append(result_json)
+                if result_json:
+                    results_json.append(result_json)
 
                 if len(results_json) >= self.valves.MAX_PROCESSED_RESULTS:
                     for task in tasks:
@@ -190,11 +189,11 @@ class Tools:
             for task in asyncio.as_completed(tasks):
                 try:
                     result_site = await task
-                except BaseException:
+                except Exception:
                     continue
-                if not result_site:
-                    continue
-                results_json.append(result_site)
+
+                if result_site:
+                    results_json.append(result_site)
 
                 if "content" in result_site:
                     await emitter.citation(
