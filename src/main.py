@@ -11,7 +11,7 @@ import json
 from collections.abc import Callable
 from typing import Any
 
-from aiohttp import ClientError, ClientSession, ClientTimeout
+from aiohttp import ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
 from utils import EventEmitter, SearchEngine, WebLoader
@@ -87,7 +87,7 @@ class Tools:
             for done in asyncio.as_completed(tasks):
                 try:
                     search_result = await done
-                except ClientError as e:
+                except BaseException as e:
                     await emitter.status(
                         status="error",
                         description=f"搜索时出错: {str(e)}",
