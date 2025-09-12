@@ -87,7 +87,7 @@ class Tools:
             for done in asyncio.as_completed(tasks):
                 try:
                     search_result = await done
-                except BaseException as e:
+                except Exception as e:
                     await emitter.status(
                         status="error",
                         description=f"搜索时出错: {str(e)}",
@@ -120,7 +120,7 @@ class Tools:
             for done in asyncio.as_completed(tasks):
                 try:
                     result_json = await done
-                except BaseException:
+                except Exception:
                     continue
 
                 if result_json:
@@ -189,7 +189,7 @@ class Tools:
             for task in asyncio.as_completed(tasks):
                 try:
                     result_site = await task
-                except BaseException:
+                except Exception:
                     continue
 
                 if result_site:
