@@ -122,10 +122,9 @@ class Tools:
                     result_json = await done
                 except BaseException:
                     continue
-                if not result_json:
-                    continue
 
-                results_json.append(result_json)
+                if result_json:
+                    results_json.append(result_json)
 
                 if len(results_json) >= self.valves.MAX_PROCESSED_RESULTS:
                     for task in tasks:
@@ -192,9 +191,9 @@ class Tools:
                     result_site = await task
                 except BaseException:
                     continue
-                if not result_site:
-                    continue
-                results_json.append(result_site)
+
+                if result_site:
+                    results_json.append(result_site)
 
                 if "content" in result_site:
                     await emitter.citation(
