@@ -1,3 +1,4 @@
+import ipaddress
 import re
 import unicodedata
 from collections.abc import Callable
@@ -58,9 +59,36 @@ class WebLoader:
         parsed_url: ParseResult = urlparse(url)
         return f"{parsed_url.scheme}://{parsed_url.netloc}"
 
+    def _is_safe_url(self, url: str) -> bool:
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme != "https":
+                return False
+            hostname = parsed.hostname or ""
+            try:
+                ip = ipaddress.ip_address(hostname)
+                if (
+                    ip.is_private
+                    or ip.is_loopback
+                    or ip.is_reserved
+                    or ip.is_link_local
+                ):
+                    return False
+            except ValueError:
+                pass
+            return not (
+                hostname in ("localhost",)
+                or hostname.endswith(".local")
+                or hostname.endswith(".localdomain")
+            )
+        except Exception:
+            return False
+
     async def fetch_and_process_page(
         self, url: str, session: ClientSession
     ) -> dict[str, str]:
+        if not self._is_safe_url(url):
+            return {"url": url, "error": "不安全的URL, 仅支持HTTPS和公共网络"}
         try:
             async with session.get(url, headers=self.headers) as response:
                 response.raise_for_status()
