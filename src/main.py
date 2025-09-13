@@ -59,7 +59,7 @@ class Tools:
 
         :params queries: 搜索中使用的关键词列表
 
-        :return: The content of the pages in json format.
+        :return: 网站内容的json格式
         """
         loader = WebLoader(
             valves=self.valves,
@@ -162,7 +162,7 @@ class Tools:
 
         :params urls: 需要打开的网站列表
 
-        :return: The content of the website in json format.
+        :return: 网站内容的json格式
         """
         loader = WebLoader(
             valves=self.valves,
