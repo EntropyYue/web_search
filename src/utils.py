@@ -163,7 +163,7 @@ class EventEmitter:
 
     async def status(
         self,
-        description: str = "未知状态",
+        description: str = "Unknown",
         status: str = "in_progress",
         done: bool = False,
         action: str | None = "web_search",
