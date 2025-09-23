@@ -14,7 +14,7 @@ from typing import Any
 from aiohttp import ClientSession, ClientTimeout
 from pydantic import BaseModel, Field
 
-from utils import EventEmitter, SearchEngine, WebLoader
+from utils import BM25Retriever, EventEmitter, LoadResult, SearchEngine, WebLoader
 
 
 class Tools:
@@ -34,6 +34,9 @@ class Tools:
         )
         GET_WEBSITE_TOKENS_LIMIT: int = Field(
             default=5000, description="获取网站的限制Token数"
+        )
+        BM25_RERANK_TOP_K: int = Field(
+            default=5, description="使用BM25重新排序时的Top K"
         )
         USE_ENV_PROXY: bool = Field(default=False, description="使用环境变量中的代理")
         WEB_LOAD_TIMEOUT: int = Field(default=5, description="网页抓取超时时间 (秒)")
@@ -97,11 +100,7 @@ class Tools:
 
                 if "results" in search_result:
                     results.extend(search_result["results"])
-
-        await emitter.urls([result.get("url", "") for result in results])
-
-        results_json: list[dict[str, str]] = []
-        if not results:
+        if len(results) == 0:
             await emitter.status(
                 status="error", description="未找到搜索结果", done=True
             )
@@ -109,6 +108,9 @@ class Tools:
                 {"error": "No search results found"}, indent=4, ensure_ascii=False
             )
 
+        await emitter.urls([result.get("url", "") for result in results])
+
+        results_json: list[LoadResult] = []
         async with ClientSession(
             trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
         ) as session:
@@ -133,26 +135,36 @@ class Tools:
                     await asyncio.gather(*tasks, return_exceptions=True)
                     break
 
-            if not len(results_json):
+            if len(results_json) == 0:
                 await emitter.fetched(0)
                 return json.dumps(
                     {"error": "No fetched results found"}, indent=4, ensure_ascii=False
                 )
 
+            await emitter.retrieval(queries)
+            bm25_retriever = BM25Retriever(
+                results_json, k=self.valves.BM25_RERANK_TOP_K
+            )
+            results_json = await bm25_retriever.ainvoke(" ".join(queries))
+
             for result in results_json:
-                await emitter.citation(
-                    document=[result["content"]],
-                    metadata=[{"source": result["url"]}],
-                    source={"name": result["title"]},
-                )
+                if result.text and result.metadata:
+                    await emitter.citation(
+                        document=[result.text],
+                        metadata=[{"source": result.metadata["url"]}],
+                        source={"name": result.metadata["title"]},
+                    )
 
         urls: list[str] = []
         for result in results_json:
-            urls.append(result["url"])
+            if result.metadata:
+                urls.append(result.metadata["url"])
 
         await emitter.fetched(len(results_json))
 
-        return json.dumps(results_json, indent=4, ensure_ascii=False)
+        return json.dumps(
+            [r.to_dict() for r in results_json], indent=4, ensure_ascii=False
+        )
 
     async def get_website(
         self, urls: list[str], __event_emitter__: Callable[[dict], Any] | None = None
@@ -195,14 +207,16 @@ class Tools:
                 if result_site:
                     results_json.append(result_site)
 
-                if "content" in result_site:
+                if result_site.text and result_site.metadata:
                     await emitter.citation(
-                        document=[result_site["content"]],
-                        metadata=[{"source": result_site["url"]}],
-                        source={"name": result_site["title"]},
+                        document=[result_site.text],
+                        metadata=[{"source": result_site.metadata["url"]}],
+                        source={"name": result_site.metadata["title"]},
                     )
         await emitter.urls([result.get("url", "") for result in results_json])
 
         await emitter.fetched(len(results_json))
 
-        return json.dumps(results_json, indent=4, ensure_ascii=False)
+        return json.dumps(
+            [r.to_dict() for r in results_json], indent=4, ensure_ascii=False
+        )

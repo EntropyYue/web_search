@@ -29,7 +29,7 @@ def replace_imports(
             ast_module = ast.parse(code, filename=file_path)
             preloaded_modules[module_name] = ast_module
         except Exception as e:
-            print(f"❌ 读取/解析模块 {file_path} 失败: {e}")
+            raise RuntimeError(f"读取/解析模块 {file_path} 失败") from e
 
     # 读取并解析主文件内容
     try:
@@ -37,8 +37,7 @@ def replace_imports(
             main_code = f.read()
         main_ast = ast.parse(main_code, filename=main_file_path)
     except Exception as e:
-        print(f"❌ 解析 {main_file_path} 失败: {e}")
-        return
+        raise RuntimeError(f"解析 {main_file_path} 失败") from e
 
     # 初始化已处理模块集合
     processed_modules = set()
@@ -97,9 +96,8 @@ def replace_imports(
     try:
         with open(output_file_path, "w", encoding="utf-8") as f:
             f.write(ast.unparse(main_ast))
-        print(f"✅ 处理完成，结果已写入 {output_file_path}")
     except Exception as e:
-        print(f"❌ 将修改后的内容写入 {output_file_path} 失败: {e}")
+        raise RuntimeError(f"将修改后的内容写入 {output_file_path} 失败:") from e
 
 
 if __name__ == "__main__":

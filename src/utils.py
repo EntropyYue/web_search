@@ -7,7 +7,20 @@ from urllib.parse import ParseResult, urlparse
 
 from aiohttp import ClientError, ClientSession
 from bs4 import BeautifulSoup
+from langchain_community.retrievers import BM25Retriever as LCBM25Retriever
+from pydantic import BaseModel
 from tiktoken import get_encoding
+
+
+class LoadResult(BaseModel):
+    text: str | None = None
+    metadata: dict[str, str] | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        if self.error:
+            return {"error": self.error}
+        return {"text": self.text, "metadata": self.metadata}
 
 
 class PageCleaner:
@@ -86,17 +99,17 @@ class WebLoader:
 
     async def fetch_and_process_page(
         self, url: str, session: ClientSession
-    ) -> dict[str, str]:
+    ) -> LoadResult:
         if not self._is_safe_url(url):
-            return {"url": url, "error": "不安全的URL, 仅支持HTTPS和公共网络"}
+            return LoadResult(error="不安全的URL, 仅支持HTTPS和公共网络")
         try:
             async with session.get(url, headers=self.headers) as response:
                 response.raise_for_status()
                 html = await response.text()
         except ClientError as e:
-            return {"url": url, "error": f"检索页面失败, 网络错误: {str(e)}"}
+            return LoadResult(error=f"检索页面失败, 网络错误: {str(e)}")
         except Exception as e:
-            return {"url": url, "error": f"检索页面失败: {str(e)}"}
+            return LoadResult(error=f"检索页面失败: {str(e)}")
 
         soup = BeautifulSoup(html, "html.parser")
         title = self.cleaner.extract_title(soup)
@@ -104,15 +117,17 @@ class WebLoader:
         clean_text = self.cleaner.clean_text(raw_text)
         truncated = self.cleaner.truncate_tokens(clean_text)
 
-        return {
-            "title": title,
-            "url": url,
-            "content": truncated,
-        }
+        return LoadResult(
+            text=truncated,
+            metadata={
+                "title": title,
+                "url": url,
+            },
+        )
 
     async def process_search_result(
         self, result: dict[str, str], session: ClientSession
-    ) -> dict[str, str] | None:
+    ) -> LoadResult | None:
         url = result["url"]
         snippet = result.get("content", "")
 
@@ -123,8 +138,8 @@ class WebLoader:
                 return None
 
         result_data = await self.fetch_and_process_page(url, session)
-        if "content" in result_data and "error" not in result_data:
-            result_data["snippet"] = self.cleaner._remove_emojis(snippet)
+        if result_data.text and result_data.metadata:
+            result_data.metadata["snippet"] = self.cleaner._remove_emojis(snippet)
             return result_data
         return None
 
@@ -150,6 +165,20 @@ class SearchEngine:
             raise RuntimeError(f"搜索时出错: {str(e)}") from e
 
 
+class BM25Retriever:
+    def __init__(self, documents: list[LoadResult], k=5) -> None:
+        texts = [doc.text or "" for doc in documents if doc.text]
+        metadatas = [doc.metadata or {} for doc in documents if doc.metadata]
+        self.retriever = LCBM25Retriever.from_texts(texts=texts, metadatas=metadatas)
+        self.retriever.k = k
+
+    async def ainvoke(self, query: str) -> list[LoadResult]:
+        results = await self.retriever.ainvoke(query)
+        return [
+            LoadResult(text=doc.page_content, metadata=doc.metadata) for doc in results
+        ]
+
+
 class EventEmitter:
     def __init__(self, valves, event_emitter: Callable[[dict], Any] | None = None):
         self.valves = valves
@@ -163,7 +192,7 @@ class EventEmitter:
 
     async def status(
         self,
-        description: str = "未知状态",
+        description: str = "Unknown",
         status: str = "in_progress",
         done: bool = False,
         action: str | None = "web_search",
@@ -197,6 +226,12 @@ class EventEmitter:
             action="web_search",
             description="Searched {{count}} sites",
             urls=urls,
+        )
+
+    async def retrieval(self, queries: list[str]) -> None:
+        await self.status(
+            action="queries_generated",
+            queries=queries,
         )
 
     async def fetched(self, count: int) -> None:
