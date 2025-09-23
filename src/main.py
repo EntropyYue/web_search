@@ -213,7 +213,9 @@ class Tools:
                         metadata=[{"source": result_site.metadata["url"]}],
                         source={"name": result_site.metadata["title"]},
                     )
-        await emitter.urls([result.get("url", "") for result in results_json])
+        await emitter.urls(
+            [result.metadata.get("url", None) for result in results_json]
+        )
 
         await emitter.fetched(len(results_json))
 
