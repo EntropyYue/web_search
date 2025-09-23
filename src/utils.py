@@ -169,9 +169,7 @@ class BM25Retriever:
     def __init__(self, documents: list[LoadResult], k=5) -> None:
         texts = [doc.text or "" for doc in documents if doc.text]
         metadatas = [doc.metadata or {} for doc in documents if doc.metadata]
-        self.retriever = LCBM25Retriever.from_texts(
-            texts=texts, metadatas=metadatas
-        )
+        self.retriever = LCBM25Retriever.from_texts(texts=texts, metadatas=metadatas)
         self.retriever.k = k
 
     async def ainvoke(self, query: str) -> list[LoadResult]:
