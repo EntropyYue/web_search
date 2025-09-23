@@ -192,7 +192,7 @@ class EventEmitter:
 
     async def status(
         self,
-        description: str = "Unknown",
+        description: str | None = None,
         status: str = "in_progress",
         done: bool = False,
         action: str | None = "web_search",
