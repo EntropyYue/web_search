@@ -36,7 +36,7 @@ class Tools:
             default=5000, description="获取网站的限制Token数"
         )
         BM25_RERANK_TOP_K: int = Field(
-            default=5, description="使用BM25重新排序时的Top K"
+            default=5, description="使用BM25重新排序时的Top-K"
         )
         USE_ENV_PROXY: bool = Field(default=False, description="使用环境变量中的代理")
         WEB_LOAD_TIMEOUT: int = Field(default=5, description="网页抓取超时时间 (秒)")
@@ -155,11 +155,6 @@ class Tools:
                         source={"name": result.metadata["title"]},
                     )
 
-        urls: list[str] = []
-        for result in results_json:
-            if result.metadata:
-                urls.append(result.metadata["url"])
-
         await emitter.fetched(len(results_json))
 
         return json.dumps(
@@ -187,7 +182,7 @@ class Tools:
 
         await emitter.queries(urls)
 
-        results_json = []
+        results_json: list[LoadResult] = []
 
         if urls == []:
             return ""
@@ -213,9 +208,6 @@ class Tools:
                         metadata=[{"source": result_site.metadata["url"]}],
                         source={"name": result_site.metadata["title"]},
                     )
-        await emitter.urls(
-            [result.metadata.get("url", None) for result in results_json]
-        )
 
         await emitter.fetched(len(results_json))
 

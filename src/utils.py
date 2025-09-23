@@ -14,7 +14,7 @@ from tiktoken import get_encoding
 
 class LoadResult(BaseModel):
     text: str | None = None
-    metadata: dict[str, str] = {}
+    metadata: dict[str, str] | None = None
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
