@@ -151,8 +151,8 @@ class Tools:
                 if result.text and result.metadata:
                     await emitter.citation(
                         document=[result.text],
-                        metadata=[{"source": result.metadata["url"]}],
-                        source={"name": result.metadata["title"]},
+                        metadata=[{"source": result.metadata.url}],
+                        source={"name": result.metadata.title},
                     )
 
         await emitter.fetched(len(results_json))
@@ -205,8 +205,8 @@ class Tools:
                 if result_site.text and result_site.metadata:
                     await emitter.citation(
                         document=[result_site.text],
-                        metadata=[{"source": result_site.metadata["url"]}],
-                        source={"name": result_site.metadata["title"]},
+                        metadata=[{"source": result_site.metadata.url}],
+                        source={"name": result_site.metadata.url},
                     )
 
         await emitter.fetched(len(results_json))

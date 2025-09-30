@@ -12,15 +12,27 @@ from pydantic import BaseModel
 from tiktoken import get_encoding
 
 
+class MetaData(BaseModel):
+    title: str
+    url: str
+    snippet: str | None = None
+
+    def dict(self) -> dict[str, str | None]:
+        return {"title": self.title, "url": self.url, "snippet": self.snippet}
+
+
 class LoadResult(BaseModel):
     text: str | None = None
-    metadata: dict[str, str] | None = None
+    metadata: MetaData | None = None
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         if self.error:
             return {"error": self.error}
-        return {"text": self.text, "metadata": self.metadata}
+        return {
+            "text": self.text,
+            "metadata": self.metadata.dict() if self.metadata else None,
+        }
 
 
 class PageCleaner:
@@ -119,10 +131,7 @@ class WebLoader:
 
         return LoadResult(
             text=truncated,
-            metadata={
-                "title": title,
-                "url": url,
-            },
+            metadata=MetaData(title=title, url=url),
         )
 
     async def process_search_result(
@@ -139,7 +148,7 @@ class WebLoader:
 
         result_data = await self.fetch_and_process_page(url, session)
         if result_data.text and result_data.metadata:
-            result_data.metadata["snippet"] = self.cleaner._remove_emojis(snippet)
+            result_data.metadata.snippet = self.cleaner._remove_emojis(snippet)
             return result_data
         return None
 
@@ -169,13 +178,16 @@ class BM25Retriever:
     def __init__(self, documents: list[LoadResult], k=5) -> None:
         texts = [doc.text or "" for doc in documents if doc.text]
         metadatas = [doc.metadata or {} for doc in documents if doc.metadata]
-        self.retriever = LCBM25Retriever.from_texts(texts=texts, metadatas=metadatas)
+        self.retriever = LCBM25Retriever.from_texts(
+            texts=texts, metadatas=(metadata.dict() for metadata in metadatas)
+        )
         self.retriever.k = k
 
     async def ainvoke(self, query: str) -> list[LoadResult]:
         results = await self.retriever.ainvoke(query)
         return [
-            LoadResult(text=doc.page_content, metadata=doc.metadata) for doc in results
+            LoadResult(text=doc.page_content, metadata=MetaData(**doc.metadata))
+            for doc in results
         ]
 
 
