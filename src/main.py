@@ -65,11 +65,15 @@ class Tools:
         :return: 网站内容的json格式
         """
         loader = WebLoader(
-            valves=self.valves,
+            ignore_websites=self.valves.IGNORED_WEBSITES,
             headers=self.headers,
-            token_limit=self.valves.SEARCH_PAGE_TOKENS_LIMIT,
+            token_limit=self.valves.GET_WEBSITE_TOKENS_LIMIT,
         )
-        emitter = EventEmitter(self.valves, __event_emitter__)
+        emitter = EventEmitter(
+            enable_status=self.valves.STATUS,
+            enable_citation=self.valves.CITATION_LINKS,
+            event_emitter=__event_emitter__,
+        )
         search_engine = SearchEngine(
             url=self.valves.SEARXNG_ENGINE_API_BASE_URL,
             max_result=self.valves.MAX_SEARCH_RESULTS,
@@ -172,11 +176,15 @@ class Tools:
         :return: 网站内容的json格式
         """
         loader = WebLoader(
-            valves=self.valves,
-            headers=self.headers,
+            ignore_websites=self.valves.IGNORED_WEBSITES,
             token_limit=self.valves.GET_WEBSITE_TOKENS_LIMIT,
+            headers=self.headers,
         )
-        emitter = EventEmitter(self.valves, __event_emitter__)
+        emitter = EventEmitter(
+            enable_status=self.valves.STATUS,
+            enable_citation=self.valves.CITATION_LINKS,
+            event_emitter=__event_emitter__,
+        )
 
         await emitter.status("Searching the web")
 

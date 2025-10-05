@@ -75,10 +75,10 @@ class PageCleaner:
 
 
 class WebLoader:
-    def __init__(self, valves, headers: dict, token_limit: int) -> None:
-        self.valves = valves
-        self.headers = headers
+    def __init__(self, ignore_websites: str, headers: dict, token_limit: int) -> None:
+        self.ignore_websites = ignore_websites
         self.cleaner = PageCleaner(token_limit=token_limit)
+        self.headers = headers
 
     def get_base_url(self, url: str) -> str:
         parsed_url: ParseResult = urlparse(url)
@@ -140,9 +140,9 @@ class WebLoader:
         url = result["url"]
         snippet = result.get("content", "")
 
-        if self.valves.IGNORED_WEBSITES:
+        if self.ignore_websites:
             base_url = self.get_base_url(url)
-            ignored_sites = [s.strip() for s in self.valves.IGNORED_WEBSITES.split(",")]
+            ignored_sites = [s.strip() for s in self.ignore_websites.split(",")]
             if any(site in base_url for site in ignored_sites):
                 return None
 
@@ -192,8 +192,14 @@ class BM25Retriever:
 
 
 class EventEmitter:
-    def __init__(self, valves, event_emitter: Callable[[dict], Any] | None = None):
-        self.valves = valves
+    def __init__(
+        self,
+        enable_status: bool,
+        enable_citation: bool,
+        event_emitter: Callable[[dict], Any] | None = None,
+    ):
+        self.enable_status = enable_status
+        self.enable_citation = enable_citation
         self.event_emitter = event_emitter
 
     async def _emit(self, type, data: dict[str, Any]) -> None:
@@ -212,7 +218,7 @@ class EventEmitter:
         count: int | None = None,
         urls: list[str] | None = None,
     ) -> None:
-        if not self.valves.STATUS:
+        if not self.enable_status:
             return
         await self._emit(
             type="status",
@@ -259,7 +265,7 @@ class EventEmitter:
         metadata: list[dict[str, str]],
         source: dict[str, str],
     ) -> None:
-        if not self.valves.CITATION_LINKS:
+        if not self.enable_citation:
             return
         await self._emit(
             type="citation",
