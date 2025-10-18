@@ -171,7 +171,7 @@ class SearchEngine:
                 result["results"] = result["results"][: self.max_result]
             return result
         except ClientError as e:
-            raise RuntimeError(f"搜索时出错: {str(e)}") from e
+            raise RuntimeError(str(e)) from e
 
 
 class BM25Retriever:
