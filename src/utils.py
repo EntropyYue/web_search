@@ -12,15 +12,27 @@ from pydantic import BaseModel
 from tiktoken import get_encoding
 
 
+class MetaData(BaseModel):
+    title: str
+    url: str
+    snippet: str | None = None
+
+    def dict(self) -> dict[str, str | None]:
+        return {"title": self.title, "url": self.url, "snippet": self.snippet}
+
+
 class LoadResult(BaseModel):
     text: str | None = None
-    metadata: dict[str, str] | None = None
+    metadata: MetaData | None = None
     error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         if self.error:
             return {"error": self.error}
-        return {"text": self.text, "metadata": self.metadata}
+        return {
+            "text": self.text,
+            "metadata": self.metadata.dict() if self.metadata else None,
+        }
 
 
 class PageCleaner:
@@ -63,10 +75,10 @@ class PageCleaner:
 
 
 class WebLoader:
-    def __init__(self, valves, headers: dict, token_limit: int) -> None:
-        self.valves = valves
-        self.headers = headers
+    def __init__(self, ignore_websites: str, headers: dict, token_limit: int) -> None:
+        self.ignore_websites = ignore_websites
         self.cleaner = PageCleaner(token_limit=token_limit)
+        self.headers = headers
 
     def get_base_url(self, url: str) -> str:
         parsed_url: ParseResult = urlparse(url)
@@ -119,10 +131,7 @@ class WebLoader:
 
         return LoadResult(
             text=truncated,
-            metadata={
-                "title": title,
-                "url": url,
-            },
+            metadata=MetaData(title=title, url=url),
         )
 
     async def process_search_result(
@@ -131,15 +140,15 @@ class WebLoader:
         url = result["url"]
         snippet = result.get("content", "")
 
-        if self.valves.IGNORED_WEBSITES:
+        if self.ignore_websites:
             base_url = self.get_base_url(url)
-            ignored_sites = [s.strip() for s in self.valves.IGNORED_WEBSITES.split(",")]
+            ignored_sites = [s.strip() for s in self.ignore_websites.split(",")]
             if any(site in base_url for site in ignored_sites):
                 return None
 
         result_data = await self.fetch_and_process_page(url, session)
         if result_data.text and result_data.metadata:
-            result_data.metadata["snippet"] = self.cleaner._remove_emojis(snippet)
+            result_data.metadata.snippet = self.cleaner._remove_emojis(snippet)
             return result_data
         return None
 
@@ -162,26 +171,35 @@ class SearchEngine:
                 result["results"] = result["results"][: self.max_result]
             return result
         except ClientError as e:
-            raise RuntimeError(f"搜索时出错: {str(e)}") from e
+            raise RuntimeError(str(e)) from e
 
 
 class BM25Retriever:
     def __init__(self, documents: list[LoadResult], k=5) -> None:
         texts = [doc.text or "" for doc in documents if doc.text]
         metadatas = [doc.metadata or {} for doc in documents if doc.metadata]
-        self.retriever = LCBM25Retriever.from_texts(texts=texts, metadatas=metadatas)
+        self.retriever = LCBM25Retriever.from_texts(
+            texts=texts, metadatas=(metadata.dict() for metadata in metadatas)
+        )
         self.retriever.k = k
 
     async def ainvoke(self, query: str) -> list[LoadResult]:
         results = await self.retriever.ainvoke(query)
         return [
-            LoadResult(text=doc.page_content, metadata=doc.metadata) for doc in results
+            LoadResult(text=doc.page_content, metadata=MetaData(**doc.metadata))
+            for doc in results
         ]
 
 
 class EventEmitter:
-    def __init__(self, valves, event_emitter: Callable[[dict], Any] | None = None):
-        self.valves = valves
+    def __init__(
+        self,
+        enable_status: bool,
+        enable_citation: bool,
+        event_emitter: Callable[[dict], Any] | None = None,
+    ):
+        self.enable_status = enable_status
+        self.enable_citation = enable_citation
         self.event_emitter = event_emitter
 
     async def _emit(self, type, data: dict[str, Any]) -> None:
@@ -200,7 +218,7 @@ class EventEmitter:
         count: int | None = None,
         urls: list[str] | None = None,
     ) -> None:
-        if not self.valves.STATUS:
+        if not self.enable_status:
             return
         await self._emit(
             type="status",
@@ -247,7 +265,7 @@ class EventEmitter:
         metadata: list[dict[str, str]],
         source: dict[str, str],
     ) -> None:
-        if not self.valves.CITATION_LINKS:
+        if not self.enable_citation:
             return
         await self._emit(
             type="citation",
