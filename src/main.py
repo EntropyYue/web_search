@@ -22,6 +22,7 @@ class Tools:
         SEARXNG_ENGINE_API_BASE_URL: str = Field(
             default="https://example.com/search", description="搜索引擎的基础URL"
         )
+        SEARXNG_LANGUAGE: str = Field(default="zh-CN", description="搜索引擎使用的语言")
         IGNORED_WEBSITES: str = Field(
             default="", description="以逗号分隔的要忽略的网站列表"
         )
@@ -77,6 +78,7 @@ class Tools:
         search_engine = SearchEngine(
             url=self.valves.SEARXNG_ENGINE_API_BASE_URL,
             max_result=self.valves.MAX_SEARCH_RESULTS,
+            language=self.valves.SEARXNG_LANGUAGE,
             headers=self.headers,
         )
 
