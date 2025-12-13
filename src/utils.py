@@ -17,9 +17,6 @@ class MetaData(BaseModel):
     url: str
     snippet: str | None = None
 
-    def dict(self) -> dict[str, str | None]:
-        return {"title": self.title, "url": self.url, "snippet": self.snippet}
-
 
 class LoadResult(BaseModel):
     text: str | None = None
@@ -31,7 +28,7 @@ class LoadResult(BaseModel):
             return {"error": self.error}
         return {
             "text": self.text,
-            "metadata": self.metadata.dict() if self.metadata else None,
+            "metadata": self.metadata.model_dump() if self.metadata else None,
         }
 
 
@@ -154,13 +151,14 @@ class WebLoader:
 
 
 class SearchEngine:
-    def __init__(self, url: str, max_result: int, headers: dict) -> None:
+    def __init__(self, url: str, max_result: int, language: str, headers: dict) -> None:
         self.url = url
         self.max_result = max_result
+        self.language = language
         self.headers = headers
 
     async def search(self, query: str, session: ClientSession) -> dict[str, Any]:
-        params = {"q": query, "format": "json"}
+        params = {"q": query, "format": "json", "language": self.language}
         try:
             async with session.get(
                 self.url, params=params, headers=self.headers
