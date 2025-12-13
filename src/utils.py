@@ -17,9 +17,6 @@ class MetaData(BaseModel):
     url: str
     snippet: str | None = None
 
-    def dict(self) -> dict[str, str | None]:
-        return {"title": self.title, "url": self.url, "snippet": self.snippet}
-
 
 class LoadResult(BaseModel):
     text: str | None = None
@@ -31,7 +28,7 @@ class LoadResult(BaseModel):
             return {"error": self.error}
         return {
             "text": self.text,
-            "metadata": self.metadata.dict() if self.metadata else None,
+            "metadata": self.metadata.model_dump() if self.metadata else None,
         }
 
 
