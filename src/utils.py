@@ -177,7 +177,7 @@ class BM25Retriever:
         texts = [doc.text or "" for doc in documents if doc.text]
         metadatas = [doc.metadata or {} for doc in documents if doc.metadata]
         self.retriever = LCBM25Retriever.from_texts(
-            texts=texts, metadatas=(metadata.dict() for metadata in metadatas)
+            texts=texts, metadatas=(metadata.model_dump() for metadata in metadatas)
         )
         self.retriever.k = k
 
