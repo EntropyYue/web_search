@@ -85,6 +85,7 @@ class Tools:
         await emitter.status("Searching the web")
 
         await emitter.queries(queries)
+
         async with ClientSession(
             trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
         ) as session:
@@ -92,6 +93,7 @@ class Tools:
                 asyncio.create_task(search_engine.search(query, session))
                 for query in queries
             ]
+
             results: list[dict[str, str]] = []
             for done in asyncio.as_completed(tasks):
                 try:
@@ -106,6 +108,7 @@ class Tools:
 
                 if "results" in search_result:
                     results.extend(search_result["results"])
+
         if len(results) == 0:
             await emitter.status(
                 status="error", description="未找到搜索结果", done=True
@@ -116,7 +119,7 @@ class Tools:
 
         await emitter.urls([result.get("url", "") for result in results])
 
-        results_json: list[LoadResult] = []
+        load_results: list[LoadResult] = []
         async with ClientSession(
             trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
         ) as session:
@@ -127,21 +130,21 @@ class Tools:
 
             for done in asyncio.as_completed(tasks):
                 try:
-                    result_json = await done
+                    load_result = await done
                 except Exception:
                     continue
 
-                if result_json:
-                    results_json.append(result_json)
+                if load_result:
+                    load_results.append(load_result)
 
-                if len(results_json) >= self.valves.MAX_PROCESSED_RESULTS:
+                if len(load_results) >= self.valves.MAX_PROCESSED_RESULTS:
                     for task in tasks:
                         if not task.done():
                             task.cancel()
                     await asyncio.gather(*tasks, return_exceptions=True)
                     break
 
-            if len(results_json) == 0:
+            if len(load_results) == 0:
                 await emitter.fetched(0)
                 return json.dumps(
                     {"error": "No fetched results found"}, indent=4, ensure_ascii=False
@@ -149,11 +152,13 @@ class Tools:
 
             await emitter.retrieval(queries)
             bm25_retriever = BM25Retriever(
-                results_json, k=self.valves.BM25_RERANK_TOP_K
+                load_results, k=self.valves.BM25_RERANK_TOP_K
             )
-            results_json = await bm25_retriever.ainvoke(" ".join(queries))
+            retrieval_results: list[LoadResult] = await bm25_retriever.ainvoke(
+                " ".join(queries)
+            )
 
-            for result in results_json:
+            for result in retrieval_results:
                 if result.text and result.metadata:
                     await emitter.citation(
                         document=[result.text],
@@ -161,10 +166,10 @@ class Tools:
                         source={"name": result.metadata.title},
                     )
 
-        await emitter.fetched(len(results_json))
+        await emitter.fetched(len(retrieval_results))
 
         return json.dumps(
-            [r.to_dict() for r in results_json], indent=4, ensure_ascii=False
+            [r.to_dict() for r in retrieval_results], indent=4, ensure_ascii=False
         )
 
     async def get_website(
@@ -197,6 +202,7 @@ class Tools:
 
         if urls == []:
             return ""
+
         async with ClientSession(
             trust_env=self.valves.USE_ENV_PROXY, timeout=self.timeout
         ) as session:
