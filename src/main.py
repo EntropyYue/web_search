@@ -192,7 +192,8 @@ class Tools:
 
         await emitter.queries(urls)
 
-        results_json: list[LoadResult] = []
+        fetch_results: list[LoadResult] = []
+        results: list[LoadResult] = []
 
         if urls == []:
             return ""
@@ -209,8 +210,10 @@ class Tools:
                 except Exception:
                     continue
 
-                if result_site:
-                    results_json.append(result_site)
+                results.append(result_site)
+
+                if not result_site.error:
+                    fetch_results.append(result_site)
 
                 if result_site.text and result_site.metadata:
                     await emitter.citation(
@@ -219,8 +222,6 @@ class Tools:
                         source={"name": result_site.metadata.url},
                     )
 
-        await emitter.fetched(len(results_json))
+        await emitter.fetched(len(fetch_results))
 
-        return json.dumps(
-            [r.to_dict() for r in results_json], indent=4, ensure_ascii=False
-        )
+        return json.dumps([r.to_dict() for r in results], indent=4, ensure_ascii=False)
