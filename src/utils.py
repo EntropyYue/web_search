@@ -56,8 +56,11 @@ class PageCleaner:
 
     def truncate_tokens(self, text: str) -> str:
         tokens = self.tokenizer.encode(text)
-        truncated = self.tokenizer.decode(tokens[: self.token_limit])
-        return self._remove_invisible_chars(truncated).strip()
+        if len(tokens) < self.token_limit:
+            truncated = self.tokenizer.decode(tokens[: self.token_limit])
+            truncated += "\n[Content truncated...]"
+            return self._remove_invisible_chars(truncated).strip()
+        return self.tokenizer.decode(tokens)
 
     def _normalize_text(self, text: str) -> str:
         return unicodedata.normalize("NFKC", text).strip()
