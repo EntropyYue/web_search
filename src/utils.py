@@ -119,9 +119,9 @@ class WebLoader:
                 response.raise_for_status()
                 html = await response.text()
         except ClientError as e:
-            return LoadResult(error=f"检索页面失败, 网络错误: {str(e)}")
+            return LoadResult(error=f"获取页面失败, 网络错误: {str(e)}")
         except Exception as e:
-            return LoadResult(error=f"检索页面失败: {str(e)}")
+            return LoadResult(error=f"获取页面失败: {str(e)}")
 
         soup = BeautifulSoup(html, "html.parser")
         title = self.cleaner.extract_title(soup)
